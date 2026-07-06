@@ -1,8 +1,7 @@
 import apiMethods from "../../methods/apiMethods";
 import { API_BASE_URL } from '../../AxiosInterceptor';
 
-const CUSTOMER_MASTER_BASE_URL = "http://45.118.160.135:9192/api/v1";
-// const CUSTOMER_MASTER_BASE_URL = "http://192.168.0.186:9191/api/v1";
+const CUSTOMER_MASTER_BASE_URL = API_BASE_URL;
 
 
 // Login function 
