@@ -156,7 +156,7 @@ export default function CommandCenter({
               className="shrink-0 w-60 h-28 bg-[#0c1220]/40 hover:bg-[#0c1220]/75 border border-white/5 hover:border-blue-500/30 rounded-xl p-4 flex flex-col justify-between transition-all duration-300 group shadow-md"
             >
               <div className="flex justify-between items-start gap-2">
-                <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/15 uppercase truncate max-w-[120px]">
+                <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/15 uppercase truncate max-w-[122px]">
                   {deal.stage.replace('_', ' ')}
                 </span>
                 <span className="text-xs font-bold text-emerald-400 font-mono">{deal.value}</span>
