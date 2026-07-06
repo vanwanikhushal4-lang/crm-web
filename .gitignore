@@ -27,3 +27,4 @@ dist-ssr
 .agents/
 .agents/AGENTS.md
 
+.env

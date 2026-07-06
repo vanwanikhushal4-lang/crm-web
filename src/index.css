@@ -18,8 +18,13 @@ body {
   background: var(--bg-dark);
   color: var(--text-main);
   -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* Glassmorphism Card Utilities */

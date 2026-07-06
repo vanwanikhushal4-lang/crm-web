@@ -626,15 +626,19 @@ export const submitPunchIn = async (lat, lng, photoUri) => {
     console.log('[PunchIn] data payload:', JSON.stringify(dataPayload));
     
     if (photoUri) {
-      const filename = photoUri.split('/').pop();
-      const uploadUri = photoUri;
-      console.log('[PunchIn] image filename:', filename);
-      console.log('[PunchIn] image upload uri:', uploadUri);
-      formData.append('image', {
-        uri: uploadUri,
-        name: filename,
-        type: 'image/jpeg',
-      });
+      if (typeof photoUri === 'string') {
+        const filename = photoUri.split('/').pop();
+        const uploadUri = photoUri;
+        console.log('[PunchIn] image filename:', filename);
+        console.log('[PunchIn] image upload uri:', uploadUri);
+        formData.append('image', {
+          uri: uploadUri,
+          name: filename,
+          type: 'image/jpeg',
+        });
+      } else {
+        formData.append('image', photoUri, 'selfie.jpg');
+      }
       console.log('[PunchIn] appended image key: image');
     } else {
       console.log('[PunchIn] WARNING: photoUri missing, image not appended');
@@ -696,15 +700,19 @@ const submitPunchInWithFetchFallback = async (lat, lng, photoUri) => {
   console.log('[PunchIn:fetch] data payload:', JSON.stringify(dataPayload));
 
   if (photoUri) {
-    const filename = photoUri.split('/').pop();
-    const uploadUri = photoUri;
-    console.log('[PunchIn:fetch] image filename:', filename);
-    console.log('[PunchIn:fetch] image upload uri:', uploadUri);
-    formData.append('image', {
-      uri: uploadUri,
-      name: filename || 'checkin.jpg',
-      type: 'image/jpeg',
-    });
+    if (typeof photoUri === 'string') {
+      const filename = photoUri.split('/').pop();
+      const uploadUri = photoUri;
+      console.log('[PunchIn:fetch] image filename:', filename);
+      console.log('[PunchIn:fetch] image upload uri:', uploadUri);
+      formData.append('image', {
+        uri: uploadUri,
+        name: filename || 'checkin.jpg',
+        type: 'image/jpeg',
+      });
+    } else {
+      formData.append('image', photoUri, 'selfie.jpg');
+    }
   }
 
   const response = await fetch(`${API_BASE_URL}/punchIn`, {
