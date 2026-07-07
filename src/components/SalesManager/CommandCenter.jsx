@@ -462,7 +462,7 @@ export default function CommandCenter({
   const searchResults = getSearchMatches();
 
   return (
-    <div className="space-y-6 animate-fade">
+    <div className="space-y-6 relative z-20 animate-fade">
       
       {/* CUSTOM HEADER & GLOBAL SEARCH BAR */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0c1220]/60 border border-white/5 p-5 rounded-2xl shadow-lg">

@@ -620,7 +620,7 @@ export default function CalendarTab() {
   const displayCalls = getDailyCalls();
 
   return (
-    <div className="space-y-6 text-slate-100 animate-fade">
+    <div className="space-y-6 text-slate-100 relative z-20 animate-fade">
       
       {/* HEADER & DYNAMIC USER CONTEXT */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0b1628]/60 backdrop-blur-md border border-white/5 p-5 rounded-2xl shadow-lg">
@@ -1021,8 +1021,22 @@ export default function CalendarTab() {
 
       {/* MODAL 1: LOG MEETING */}
       {showMeetingModal && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowMeetingModal(false);
+              setCompanySearch('');
+              setContactSearch('');
+              setSuggestedCompanies([]);
+              setSuggestedContacts([]);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <h3 className="text-base font-bold text-slate-100">Log Customer Meeting</h3>
@@ -1173,8 +1187,18 @@ export default function CalendarTab() {
 
       {/* MODAL 2: LOG TASK */}
       {showTaskModal && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTaskModal(false);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <h3 className="text-base font-bold text-slate-100">Create Task Log</h3>
@@ -1262,8 +1286,18 @@ export default function CalendarTab() {
 
       {/* MODAL 3: DIALER DIRECTORY (Direct Phone placement select) */}
       {showDialerDirectory && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl animate-fade">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDialerDirectory(false);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl animate-fade cursor-default"
+          >
             <div className="flex justify-between items-center border-b border-white/5 pb-3">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
                 <Phone className="h-4 text-purple-400" />
@@ -1319,8 +1353,18 @@ export default function CalendarTab() {
 
       {/* MODAL 4: LOG CALL RESULTS */}
       {showCallModal && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCallModal(false);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
@@ -1458,8 +1502,21 @@ export default function CalendarTab() {
 
       {/* OVERLAY: MEETING CORE ACTIONS OVERLAY */}
       {showActionOverlay && selectedMeeting && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade max-h-[90vh] overflow-y-auto hide-scrollbar">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowActionOverlay(false);
+              setSelectedMeeting(null);
+              setAttachments([]);
+              setMomNotes('');
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade max-h-[90vh] overflow-y-auto hide-scrollbar cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <div>

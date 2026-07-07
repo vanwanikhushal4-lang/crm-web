@@ -536,7 +536,7 @@ export default function PipelineTab() {
   };
 
   return (
-    <div className="space-y-6 text-slate-100 animate-fade">
+    <div className="space-y-6 text-slate-100 relative z-20 animate-fade">
       
       {/* HEADER & DYNAMIC DATE */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0b1628]/60 border border-white/5 p-5 rounded-2xl shadow-lg">

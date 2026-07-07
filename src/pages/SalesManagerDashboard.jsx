@@ -87,7 +87,7 @@ export default function SalesManagerDashboard() {
     { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
     { id: 'contacts', label: 'Contacts', icon: Users },
   ];
-
+  
   return (
     <div className="flex h-screen bg-[#070b13] text-slate-100 font-sans overflow-hidden">
       
@@ -135,7 +135,7 @@ export default function SalesManagerDashboard() {
               <User className="h-5 w-5 text-blue-400" />
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-semibold text-slate-200 truncate">Anish Patil</p>
+              <p className="text-sm font-semibold text-slate-200 truncate">User</p>
               <p className="text-xs text-slate-500 truncate">Sales Manager</p>
             </div>
           </div>

@@ -433,10 +433,10 @@ export default function ContactsTab() {
   };
 
   return (
-    <div className="space-y-6 text-slate-100 animate-fade relative pb-20">
+    <div className="space-y-6 text-slate-100 relative z-20 pb-20">
       
       {/* HEADER SEARCH BAR & CREATE SHORTCUTS */}
-      <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between bg-[#0b1628]/60 border border-white/5 p-5 rounded-2xl shadow-lg">
+      <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between bg-[#0b1628]/60 border border-white/5 p-5 rounded-2xl shadow-lg animate-fade">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
           <input
@@ -473,7 +473,7 @@ export default function ContactsTab() {
       </div>
 
       {/* COLLAPSIBLE COMPANY ACCORDIONS */}
-      <div className="space-y-4">
+      <div className="space-y-4 animate-fade">
         {groupedContacts.map(([companyName, reps]) => {
           const isOpen = expandedCompanies[companyName];
           return (
@@ -617,8 +617,18 @@ export default function ContactsTab() {
 
       {/* MODAL 1: ADD CONTACT MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddModal(false);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <h3 className="text-base font-bold text-slate-100">Add Account Representative</h3>
@@ -738,8 +748,19 @@ export default function ContactsTab() {
 
       {/* MODAL 2: EDIT CONTACT MODAL */}
       {showEditModal && selectedContact && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEditModal(false);
+              setSelectedContact(null);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <h3 className="text-base font-bold text-slate-100">Edit Representative Profile</h3>
@@ -852,8 +873,19 @@ export default function ContactsTab() {
 
       {/* MODAL 3: MOM HISTORY TIMELINE OVERLAY */}
       {showMomHistoryModal && selectedContact && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade relative max-h-[85vh] flex flex-col">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowMomHistoryModal(false);
+              setSelectedContact(null);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade relative max-h-[85vh] flex flex-col cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <div>
@@ -908,8 +940,19 @@ export default function ContactsTab() {
 
       {/* MODAL 4: QUICK MEETING LOG MODAL */}
       {showMeetingModal && selectedContact && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowMeetingModal(false);
+              setSelectedContact(null);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
@@ -975,8 +1018,19 @@ export default function ContactsTab() {
 
       {/* MODAL 5: QUICK CALL LOG MODAL */}
       {showCallModal && selectedContact && (
-        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCallModal(false);
+              setSelectedContact(null);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar cursor-default"
+          >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
