@@ -10,7 +10,9 @@ import {
   LogOut,
   Menu,
   Activity,
-  User
+  User,
+  Share2,
+  FileText
 } from 'lucide-react';
 
 // Import modular subcomponents
@@ -18,6 +20,10 @@ import CommandCenter from '../components/SalesManager/CommandCenter';
 import CalendarTab from '../components/SalesManager/CalendarTab';
 import PipelineTab from '../components/SalesManager/PipelineTab';
 import ContactsTab from '../components/SalesManager/ContactsTab';
+import ShareContactTab from '../components/SalesManager/ShareContactTab';
+import DssrTab from '../components/SalesManager/DssrTab';
+
+
 
 export default function SalesManagerDashboard() {
   const navigate = useNavigate();
@@ -86,6 +92,8 @@ export default function SalesManagerDashboard() {
     { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
     { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
     { id: 'contacts', label: 'Contacts', icon: Users },
+    { id: 'shareContact', label: 'Share Contact', icon: Share2 },
+    { id: 'dssr', label: 'DSSR', icon: FileText },
   ];
   
   return (
@@ -222,6 +230,14 @@ export default function SalesManagerDashboard() {
               setContacts={setContacts}
               searchQuery={searchQuery}
             />
+          )}
+
+          {activeTab === 'shareContact' && (
+            <ShareContactTab />
+          )}
+
+          {activeTab === 'dssr' && (
+            <DssrTab />
           )}
 
         </div>

@@ -494,7 +494,7 @@ export default function CommandCenter({
       </div>
 
       {/* SHIFT STATUS CARD (PUNCH IN / PUNCH OUT) */}
-      <div className="bg-gradient-to-r from-[#0c1220] to-[#0e1628] border border-white/10 rounded-2xl p-5 shadow-lg">
+      {/* <div className="bg-gradient-to-r from-[#0c1220] to-[#0e1628] border border-white/10 rounded-2xl p-5 shadow-lg">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
             <button
@@ -530,7 +530,7 @@ export default function CommandCenter({
             </div>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* KPI METRICS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

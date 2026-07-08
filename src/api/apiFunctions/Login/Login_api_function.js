@@ -793,3 +793,26 @@ export const meetingCheckIn = async (payload) => {
     throw error;
   }
 };
+
+export const saveOrUpdateDssr = async (payload) => {
+  try {
+    const res = await apiMethods.post(`${CUSTOMER_MASTER_BASE_URL}/dssr/saveOrUpdateDssr`, payload);
+    return res;
+  } catch (error) {
+    console.error('Save or Update DSSR API Error:', error);
+    throw error;
+  }
+};
+
+export const getDssrById = async (id) => {
+  try {
+    const res = await apiMethods.get(`${CUSTOMER_MASTER_BASE_URL}/dssr/getDssr?id=${id}`);
+    return res;
+  } catch (error) {
+    console.error('Get DSSR by ID API Error:', error);
+    throw error;
+  }
+};
+
+
+
