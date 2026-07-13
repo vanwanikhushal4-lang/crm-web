@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, User, Lock } from 'lucide-react';
 import { loginUser } from '../api/apiFunctions/Login/Login_api_function';
+import bizdriveLogo from '../assets/BIZDRIVE-LOGO.png';
+
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -60,14 +62,11 @@ export default function Login() {
     <div className="flex items-center justify-center" style={{ minHeight: '100vh' }}>
       <div className="glass-panel animate-fade" style={{ width: '100%', maxWidth: '400px', padding: '40px 32px' }}>
         <div className="flex-col items-center mb-6">
-          <div className="flex items-center justify-center mb-4" style={{ 
-            width: '64px', height: '64px', borderRadius: '16px', 
-            background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' 
-          }}>
-            <LogIn size={32} />
+          <div className="flex justify-center mb-4">
+            <div style={{ background: '#343439', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: '330px', boxShadow: '0 4px 6px -1px rgba(255 0 0 / 10%), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
+              <img src={bizdriveLogo} alt="BizDrive Logo" style={{ height: '85px', width: 'auto', objectFit: 'contain' }} />
+            </div>
           </div>
-          <h2 className="title-gradient" style={{ fontSize: '28px', textAlign: 'center' }}>Velox CRM</h2>
-          <p className="text-muted" style={{ textAlign: 'center', marginTop: '8px' }}>Sign in to continue</p>
         </div>
 
         {errorMsg && (
