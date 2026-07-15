@@ -63,7 +63,7 @@ export default function Login() {
       <div className="glass-panel animate-fade" style={{ width: '100%', maxWidth: '400px', padding: '40px 32px' }}>
         <div className="flex-col items-center mb-6">
           <div className="flex justify-center mb-4">
-            <div style={{ background: '#343439', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: '330px', boxShadow: '0 4px 6px -1px rgba(255 0 0 / 10%), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
+            <div style={{ background: '#010008', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: '330px', boxShadow: '0 4px 6px -1px rgba(255 0 0 / 10%), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
               <img src={bizdriveLogo} alt="BizDrive Logo" style={{ height: '85px', width: 'auto', objectFit: 'contain' }} />
             </div>
           </div>

@@ -93,7 +93,7 @@ export default function SalesManagerDashboard() {
     { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
     { id: 'contacts', label: 'Contacts', icon: Users },
     { id: 'shareContact', label: 'Share Contact', icon: Share2 },
-    { id: 'dssr', label: 'DSSR', icon: FileText },
+    // { id: 'dssr', label: 'DSSR', icon: FileText },
   ];
   
   return (
@@ -236,9 +236,9 @@ export default function SalesManagerDashboard() {
             <ShareContactTab />
           )}
 
-          {activeTab === 'dssr' && (
+          {/* {activeTab === 'dssr' && (
             <DssrTab />
-          )}
+          )} */}
 
         </div>
       </main>

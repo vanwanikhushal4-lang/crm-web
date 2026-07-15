@@ -903,7 +903,7 @@ export default function CalendarTab() {
                           ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                           : 'bg-slate-800 text-slate-400 border-white/5'
                       }`}>
-                        {task.priority}
+                        {task.priority || 'N/A'}
                       </span>
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
                         task.status === 'COMPLETED'
@@ -912,7 +912,7 @@ export default function CalendarTab() {
                           ? 'bg-amber-500/10 text-amber-400'
                           : 'bg-slate-800 text-slate-400'
                       }`}>
-                        {task.status.replace('_', ' ')}
+                        {(task.status || 'PENDING').replace('_', ' ')}
                       </span>
                     </div>
                   </div>
