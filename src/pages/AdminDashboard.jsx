@@ -1,33 +1,65 @@
 import { useNavigate } from 'react-router-dom';
-import { Users, Map, BarChart3, LogOut, Search, Clock, CalendarDays } from 'lucide-react';
+import { Users, Map, BarChart3, LogOut, Search, Clock, CalendarDays, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import DailyAttendance from './Admin/DailyAttendance';
 import SalespersonActivity from './Admin/SalespersonActivity';
+import ChiefAdminLeadsDashboard from './Admin/ChiefAdminLeadsDashboard';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('attendance');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="dashboard-layout" style={{ display: 'flex', height: '100vh', backgroundColor: '#0f172a', color: '#f8fafc' }}>
+    <div className="dashboard-layout" style={{ display: 'flex', height: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', position: 'relative' }}>
+      
+      {/* Backdrop overlay for mobile sidebar */}
+      {isSidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <div className="flex-col glass-panel sidebar-layout" style={{ width: '280px', padding: '24px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-        <h2 className="title-gradient mb-6" style={{ fontSize: '24px' }}>Chief Admin</h2>
+      <div className={`flex-col glass-panel sidebar-layout ${isSidebarOpen ? 'open' : ''}`} style={{ width: '280px', padding: '24px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="title-gradient" style={{ fontSize: '24px' }}>Admin</h2>
+          <button 
+            className="mobile-header"
+            onClick={() => setIsSidebarOpen(false)}
+            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+          >
+            <X size={20} />
+          </button>
+        </div>
         
         <div className="flex-col gap-2" style={{ flex: 1 }}>
-          <button className={`btn ${activeTab === 'overview' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => setActiveTab('overview')}>
+          <button className={`btn ${activeTab === 'overview' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
+            setActiveTab('overview');
+            setIsSidebarOpen(false);
+          }}>
             <BarChart3 size={18} /> Overview
           </button>
-          <button className={`btn ${activeTab === 'tracking' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => setActiveTab('tracking')}>
+          <button className={`btn ${activeTab === 'tracking' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
+            setActiveTab('tracking');
+            setIsSidebarOpen(false);
+          }}>
             <Map size={18} /> Live Map Tracking
           </button>
-          <button className={`btn ${activeTab === 'attendance' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => setActiveTab('attendance')}>
+          <button className={`btn ${activeTab === 'attendance' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
+            setActiveTab('attendance');
+            setIsSidebarOpen(false);
+          }}>
             <Clock size={18} /> Daily Attendance
           </button>
-          <button className={`btn ${activeTab === 'sales-calendar' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => setActiveTab('sales-calendar')}>
+          <button className={`btn ${activeTab === 'sales-calendar' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
+            setActiveTab('sales-calendar');
+            setIsSidebarOpen(false);
+          }}>
             <CalendarDays size={18} />  Calendars
           </button>
-          <button className={`btn ${activeTab === 'approvals' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => setActiveTab('approvals')}>
+          <button className={`btn ${activeTab === 'approvals' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
+            setActiveTab('approvals');
+            setIsSidebarOpen(false);
+          }}>
             <Users size={18} /> User Approvals
           </button>
         </div>
@@ -42,6 +74,38 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="flex-col content-layout" style={{ flex: 1, padding: '32px', overflowY: 'auto', overflowX: 'hidden' }}>
+        
+        {/* Mobile Header Bar */}
+        <div className="mobile-header" style={{ 
+          alignItems: 'center', 
+          gap: '12px', 
+          padding: '12px 16px', 
+          background: 'rgba(30, 41, 59, 0.4)', 
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '12px',
+          marginBottom: '20px'
+        }}>
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: '#fff', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center',
+              padding: '6px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)'
+            }}
+          >
+            <Menu size={20} />
+          </button>
+          <span style={{ fontSize: '16px', fontWeight: '700', textTransform: 'capitalize', color: '#fff' }}>
+            {activeTab === 'overview' ? 'Leads Pipeline Dashboard' : (activeTab === 'sales-calendar' ? 'Calendars' : activeTab.replace('-', ' '))}
+          </span>
+        </div>
+
         {activeTab === 'attendance' && <DailyAttendance />}
         
         {activeTab === 'sales-calendar' && <SalespersonActivity />}
@@ -67,9 +131,7 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {activeTab === 'overview' && (
-           <div className="flex justify-center items-center h-full"><p className="text-muted">Overview Dashboard (Coming Soon)</p></div>
-        )}
+        {activeTab === 'overview' && <ChiefAdminLeadsDashboard />}
         
         {activeTab === 'approvals' && (
            <div className="flex justify-center items-center h-full"><p className="text-muted">Pending User Approvals (Coming Soon)</p></div>

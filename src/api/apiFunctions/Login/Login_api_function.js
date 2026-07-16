@@ -133,6 +133,16 @@ export const getLeads = async () => {
   }
 };
 
+export const getAllLeads = async () => {
+  try {
+    const res = await apiMethods.get('/lead/getAllLeads');
+    return res;
+  } catch (error) {
+    console.error('Get All Leads API Error:', error);
+    throw error;
+  }
+};
+
 export const saveOrUpdateTaskLog = async (payload) => {
   try {
     const res = await apiMethods.post('/TaskLog/saveOrUpdateTaskLog', payload);
