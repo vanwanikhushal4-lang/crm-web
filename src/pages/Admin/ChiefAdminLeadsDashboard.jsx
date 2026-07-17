@@ -863,58 +863,57 @@ export default function ChiefAdminLeadsDashboard() {
 
                 </div>
 
-                {/* Sub-Filters Chips (Rep filtering inside lists) */}
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <p className="text-muted" style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Filter List by Sales Person:</p>
-                  <div className="timeline-strip hide-scrollbar" style={{ paddingBottom: '4px' }}>
-                    
-                    <button 
-                      onClick={() => setListRepFilter('ALL')}
-                      style={{ 
-                        flexShrink: 0,
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        border: '1px solid',
+                {/* Sub-Filters Dropdown (Rep filtering inside lists) */}
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label htmlFor="salesperson-select" className="text-muted" style={{ fontSize: '12px', fontWeight: '600' }}>Filter List by Sales Person:</label>
+                  <div style={{ position: 'relative', height: '34px', maxWidth: '320px', width: '100%' }}>
+                    <select
+                      id="salesperson-select"
+                      value={listRepFilter}
+                      onChange={(e) => setListRepFilter(e.target.value)}
+                      className="input-field"
+                      style={{
+                        appearance: 'none',
                         cursor: 'pointer',
-                        fontSize: '12px',
+                        paddingRight: '40px',
+                        paddingLeft: '12px',
+                        paddingTop: '4px',
+                        paddingBottom: '4px',
+                        fontSize: '13px',
+                        height: '34px',
                         fontWeight: '600',
-                        transition: 'all 0.2s',
-                        background: listRepFilter === 'ALL' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.02)',
-                        borderColor: listRepFilter === 'ALL' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.05)',
-                        color: listRepFilter === 'ALL' ? '#60a5fa' : '#94a3b8'
+                        color: '#fff',
+                        background: 'rgba(30, 41, 59, 0.6)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        width: '100%'
                       }}
                     >
-                      All Sales People
-                    </button>
-
-                    {allUsers.map((user) => {
-                      const uId = String(user.id || user.userId);
-                      const hasMatches = (activeTab === 'HOT' ? filteredHotLeads : filteredWarmLeads).some(l => String(l.userId) === uId) || listRepFilter === uId;
-                      
-                      return (
-                        <button
-                          key={uId}
-                          onClick={() => setListRepFilter(uId)}
-                          style={{
-                            flexShrink: 0,
-                            padding: '6px 14px',
-                            borderRadius: '20px',
-                            border: '1px solid',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            transition: 'all 0.2s',
-                            background: listRepFilter === uId ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.02)',
-                            borderColor: listRepFilter === uId ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.05)',
-                            color: listRepFilter === uId ? '#60a5fa' : '#94a3b8',
-                            opacity: hasMatches ? 1 : 0.5
-                          }}
-                        >
-                          {getUserName(uId)}
-                        </button>
-                      );
-                    })}
-
+                      <option value="ALL" style={{ background: '#0f172a', color: '#fff' }}>All Sales People</option>
+                      {allUsers.map((user) => {
+                        const uId = String(user.id || user.userId);
+                        return (
+                          <option 
+                            key={uId} 
+                            value={uId}
+                            style={{ background: '#0f172a', color: '#fff' }}
+                          >
+                            {getUserName(uId)}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <div style={{
+                      position: 'absolute',
+                      right: '14px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: '#94a3b8',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}>
+                      <ChevronDown size={16} />
+                    </div>
                   </div>
                 </div>
 
