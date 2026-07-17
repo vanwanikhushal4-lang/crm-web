@@ -17,7 +17,8 @@ import {
   Phone,
   Mail,
   MapPin,
-  Tag
+  Tag,
+  Table
 } from 'lucide-react';
 
 import {
@@ -53,9 +54,66 @@ export const formatCr = (value, emptyLabel = 'TBD') => {
   return `₹${Math.round(number * 10000000).toLocaleString('en-IN')}`;
 };
 
+export const getStageFromMom = (mom) => {
+  const nextStep = String(mom?.outcome?.next_step || mom?.next_step || '').toLowerCase();
+  const rawStage = Number(mom?.stage || mom?.finalStage || 1);
+
+  if (nextStep.includes('lost') || nextStep.includes('reject') || nextStep.includes('not interested')) return 'LOST';
+  if (nextStep.includes('won') || nextStep.includes('closed') || nextStep.includes('closure')) return 'WON';
+  if (nextStep.includes('negotiation')) return 'NEGOTIATION';
+  if (nextStep.includes('proposal') || nextStep.includes('commercial')) return 'PROPOSAL_SENT';
+  if (nextStep.includes('demo') || nextStep.includes('poc') || nextStep.includes('qualified')) return 'QUALIFIED';
+  if (nextStep.includes('technical') || nextStep.includes('discussion')) return 'TECH_DISCUSSION';
+  
+  const stageMap = {
+    1: 'NEW_LEAD',
+    2: 'CONTACTED',
+    3: 'QUALIFIED',
+    4: 'PROPOSAL_SENT',
+    5: 'NEGOTIATION',
+    6: 'WON',
+    7: 'LOST'
+  };
+  return stageMap[rawStage] || 'NEW_LEAD';
+};
+
+export const getStageFromLead = (lead, fallbackMom) => {
+  const raw = String(lead?.stage || lead?.leadStage || lead?.status || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const stageMap = {
+    NEW: 'NEW_LEAD',
+    NEW_LEAD: 'NEW_LEAD',
+    INITIAL_CONTACT: 'NEW_LEAD',
+    CONTACTED: 'CONTACTED',
+    TECH_DISCUSSION: 'TECH_DISCUSSION',
+    QUALIFIED: 'QUALIFIED',
+    DEMO: 'QUALIFIED',
+    PROPOSAL: 'PROPOSAL_SENT',
+    PROPOSAL_SENT: 'PROPOSAL_SENT',
+    NEGOTIATION: 'NEGOTIATION',
+    WON: 'WON',
+    LOST: 'LOST',
+  };
+
+  if (stageMap[raw]) return stageMap[raw];
+  const numericStage = Number(lead?.stage || lead?.stageId || lead?.leadStageId);
+  if (numericStage >= 1 && numericStage <= 7) {
+    const numMap = {
+      1: 'NEW_LEAD',
+      2: 'CONTACTED',
+      3: 'QUALIFIED',
+      4: 'PROPOSAL_SENT',
+      5: 'NEGOTIATION',
+      6: 'WON',
+      7: 'LOST'
+    };
+    return numMap[numericStage];
+  }
+  return fallbackMom ? getStageFromMom(fallbackMom) : 'NEW_LEAD';
+};
+
 export default function PipelineTab() {
   const [pipelineType, setPipelineType] = useState('meeting'); // meeting, lead
-  const [viewMode, setViewMode] = useState('board'); // board, list
+  const [viewMode, setViewMode] = useState('table'); // board, list, table
   const [isLoading, setIsLoading] = useState(false);
 
   // Filter and search states
@@ -223,7 +281,7 @@ export default function PipelineTab() {
         contactName: lead.contactName || matchedCust.contactPerson || matchedCust.name || 'Unassigned',
         email: lead.email || matchedCust.email || '',
         phone: lead.phone || matchedCust.phone || '',
-        stage: lead.stage || 'NEW_LEAD',
+        stage: getStageFromLead(lead, matchedMom),
         dealValue: lead.dealValue || '0',
         dealValueNumeric: dealValNum,
         expectedCloseDate: lead.expectedCloseDate || '',
@@ -464,7 +522,7 @@ export default function PipelineTab() {
       // 3. Filter by Segment selection:
       // Meeting Pipeline typically tracks active/discussion pipelines, while Leads tracks raw/unassigned prospects.
       // We can classify deals with values as active pipeline meetings, and unvalued/new leads as Leads.
-      const isLeadOnly = row.stage === 'NEW_LEAD' || row.dealValueNumeric === 0;
+      const isLeadOnly = row.dealValueNumeric === 0;
       const matchSegment = pipelineType === 'meeting' ? !isLeadOnly : isLeadOnly;
 
       // 4. Advanced Filters
@@ -718,6 +776,15 @@ export default function PipelineTab() {
           {/* View Mode Toggle pills */}
           <div className="flex bg-[#0c1220]/60 p-1 rounded-xl border border-white/5 select-none shrink-0">
             <button
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'table' ? 'bg-slate-800 text-white' : 'text-slate-400'
+              }`}
+              title="Table View"
+            >
+              <Table className="h-4 w-4" />
+            </button>
+            <button
               onClick={() => setViewMode('board')}
               className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
                 viewMode === 'board' ? 'bg-slate-800 text-white' : 'text-slate-400'
@@ -819,17 +886,17 @@ export default function PipelineTab() {
 
       {/* 1. BOARD VIEW (KANBAN) */}
       {viewMode === 'board' && (
-        <div className="flex overflow-x-auto gap-6 pb-6 select-none hide-scrollbar scroll-smooth">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-6 select-none">
           {KANBAN_COLUMNS.map((col) => {
             const colLeads = getKanbanColumnLeads(col.dbStages);
             return (
               <div
                 key={col.key}
-                className="w-80 shrink-0 bg-[#0c1220]/40 border border-white/5 rounded-2xl p-5 flex flex-col max-h-[60vh] overflow-y-auto hide-scrollbar space-y-4"
+                className="w-full bg-[#0c1220]/40 border border-white/5 rounded-2xl p-5 flex flex-col max-h-[60vh] overflow-y-auto hide-scrollbar space-y-4"
               >
                 {/* Header column title */}
                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider truncate max-w-[200px]">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pr-2">
                     {col.label}
                   </span>
                   <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono font-bold">
@@ -881,6 +948,97 @@ export default function PipelineTab() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* 3. TABLE VIEW */}
+      {viewMode === 'table' && (
+        <div className="bg-[#0c1220]/40 border border-white/5 rounded-2xl overflow-hidden shadow-lg animate-fade">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 bg-slate-900/40 text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                  <th className="py-4 px-5">Company / Client</th>
+                  <th className="py-4 px-5">Contact Person</th>
+                  <th className="py-4 px-5">Designation</th>
+                  <th className="py-4 px-5">Stage</th>
+                  <th className="py-4 px-5">Deal Value</th>
+                  <th className="py-4 px-5">Close Date</th>
+                  <th className="py-4 px-5">Priority</th>
+                  <th className="py-4 px-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-xs text-slate-300">
+                {filteredRows.map((lead) => (
+                  <tr key={lead.id} className="hover:bg-slate-900/30 transition">
+                    <td className="py-4 px-5">
+                      <div className="flex items-center gap-2">
+                        {lead.isHighRisk && (
+                          <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0" title="High Risk - Action Overdue" />
+                        )}
+                        <span className="font-bold text-slate-100">{lead.company}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-5">{lead.contactName}</td>
+                    <td className="py-4 px-5">{lead.designation || 'TBD'}</td>
+                    <td className="py-4 px-5">
+                      <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded uppercase text-[9px] font-bold">
+                        {lead.stage.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 font-mono font-bold text-emerald-400">
+                      {formatCr(lead.dealValueNumeric)}
+                    </td>
+                    <td className="py-4 px-5 font-mono text-slate-400">
+                      {lead.expectedCloseDate || 'TBD'}
+                    </td>
+                    <td className="py-4 px-5">
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                        lead.priority === 'HIGH' || lead.priority === 'HOT'
+                          ? 'bg-red-500/10 text-red-400 border border-red-500/15'
+                          : lead.priority === 'MEDIUM' || lead.priority === 'WARM'
+                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/15'
+                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/15'
+                      }`}>
+                        {lead.priority}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5">
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            setSelectedLead(lead);
+                            setShowDetailsModal(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] font-bold transition border border-white/5"
+                        >
+                          Details
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedLead(lead);
+                            setMomNotes(lead.notes || '');
+                            setShowMomModal(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                        >
+                          <FileText className="h-3 w-3" />
+                          MOM
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredRows.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="py-12 text-center text-slate-500 font-medium">
+                      No leads matching filters
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
