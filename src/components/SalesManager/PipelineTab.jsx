@@ -69,10 +69,10 @@ export default function PipelineTab() {
     partner: '',
     leadSource: 'DIRECT',
     expectedCloseDate: '',
-    priority: 'MEDIUM',
+    priority: 'WARM',
     notes: '',
     address: '',
-    customerType: 'NEW'
+    customerType: 'Customer'
   });
 
   const [momNotes, setMomNotes] = useState('');
@@ -188,9 +188,9 @@ export default function PipelineTab() {
         today.setHours(0,0,0,0);
         if (followUpDateObj < today && !['WON', 'LOST'].includes(lead.stage)) {
           isOverdue = true;
-          // If overdue by more than 7 days or priority is HIGH, flag high-risk
+          // If overdue by more than 7 days or priority is HIGH/HOT, flag high-risk
           const diffDays = Math.ceil((today - followUpDateObj) / (1000 * 60 * 60 * 24));
-          if (diffDays > 7 || lead.priority === 'HIGH') {
+          if (diffDays > 7 || lead.priority === 'HIGH' || lead.priority === 'HOT') {
             isHighRisk = true;
           }
         }
@@ -308,7 +308,7 @@ export default function PipelineTab() {
       alert('Lead opportunity saved successfully!');
       setShowCreateModal(false);
       // Reset form
-      setLeadForm({ company: '', product: [], industry: '', city: '', contactName: '', designation: '', email: '', phone: '', stage: 'NEW_LEAD', dealValue: '', partner: '', leadSource: 'DIRECT', expectedCloseDate: '', priority: 'MEDIUM', notes: '', address: '', customerType: 'NEW' });
+      setLeadForm({ company: '', product: [], industry: '', city: '', contactName: '', designation: '', email: '', phone: '', stage: 'NEW_LEAD', dealValue: '', partner: '', leadSource: 'DIRECT', expectedCloseDate: '', priority: 'WARM', notes: '', address: '', customerType: 'Customer' });
       setCompanySearch('');
       setContactSearch('');
       fetchPipelineData();
@@ -841,9 +841,9 @@ export default function PipelineTab() {
                       <div className="flex justify-between items-center mt-3 text-xs">
                         <span className="text-emerald-400 font-bold font-mono">{lead.dealValue > 0 ? `${parseFloat(lead.dealValue).toFixed(1)} Cr` : 'TBD'}</span>
                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                          lead.priority === 'HIGH'
+                          lead.priority === 'HIGH' || lead.priority === 'HOT'
                             ? 'bg-red-500/10 text-red-400 border border-red-500/15'
-                            : lead.priority === 'MEDIUM'
+                            : lead.priority === 'MEDIUM' || lead.priority === 'WARM'
                             ? 'bg-amber-500/10 text-amber-400 border border-amber-500/15'
                             : 'bg-blue-500/10 text-blue-400 border border-blue-500/15'
                         }`}>
@@ -1221,9 +1221,9 @@ export default function PipelineTab() {
                     onChange={(e) => setLeadForm({ ...leadForm, priority: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
                   >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
+                    <option value="COLD">Low</option>
+                    <option value="WARM">Medium</option>
+                    <option value="HOT">High</option>
                   </select>
                 </div>
               </div>
