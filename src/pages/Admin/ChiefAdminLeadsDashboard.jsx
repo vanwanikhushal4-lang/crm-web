@@ -329,6 +329,394 @@ export default function ChiefAdminLeadsDashboard() {
     return ownershipSummary.find(x => x.owner.toLowerCase() === selectedRep.toLowerCase()) || null;
   }, [selectedRep, ownershipSummary, mappedLeads, summary, hotLeads, warmLeads]);
 
+  // Leads filtered for dashboard graphs based on representative selection
+  const filteredLeadsForCharts = useMemo(() => {
+    if (selectedRep === 'All Team Members') {
+      return mappedLeads;
+    }
+    return mappedLeads.filter(l => l.owner.toLowerCase() === selectedRep.toLowerCase());
+  }, [mappedLeads, selectedRep]);
+
+  // Dynamic Weekly Partitions for Dashboard Charts
+  const weeklyMetrics = useMemo(() => {
+    const weeks = [
+      { name: 'W1', hot: 0, warm: 0 },
+      { name: 'W2', hot: 0, warm: 0 },
+      { name: 'W3', hot: 0, warm: 0 },
+      { name: 'W4', hot: 0, warm: 0 },
+    ];
+
+    filteredLeadsForCharts.forEach(l => {
+      if (!l.date) return;
+      const d = new Date(l.date);
+      if (isNaN(d.getTime())) return;
+      const day = d.getDate();
+      
+      let wIdx = 0;
+      if (day > 21) wIdx = 3;
+      else if (day > 14) wIdx = 2;
+      else if (day > 7) wIdx = 1;
+
+      if (l.priority === 'Hot') {
+        weeks[wIdx].hot += l.value;
+      } else if (l.priority === 'Warm') {
+        weeks[wIdx].warm += l.value;
+      }
+    });
+
+    return weeks;
+  }, [filteredLeadsForCharts]);
+
+  // Dynamic 6-Month Cumulative Pipeline Data (Last 6 Months)
+  const lastSixMonthsCumulative = useMemo(() => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - i, 1);
+      months.push({
+        date: d,
+        name: d.toLocaleString('en-US', { month: 'short' }),
+        year: d.getFullYear(),
+        monthIndex: d.getMonth(),
+        value: 0,
+        cumulativeValue: 0
+      });
+    }
+
+    const list = extractList(allLeads);
+    const filteredLeads = list.filter(lead => {
+      const assigned = lead.assignedTo || lead.userId || lead.user_id || lead.salesmanId;
+      const ownerId = String(assigned || '');
+      const ownerName = userNameMap[ownerId] || 'Unknown Owner';
+
+      if (selectedRep !== 'All Team Members') {
+        return ownerName.toLowerCase() === selectedRep.toLowerCase();
+      }
+      return true;
+    });
+
+    filteredLeads.forEach(lead => {
+      const dateStr = lead.expectedCloseDate || lead.expected_close_date || lead.createdAt;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return;
+      const leadYear = d.getFullYear();
+      const leadMonth = d.getMonth();
+
+      const match = months.find(m => m.year === leadYear && m.monthIndex === leadMonth);
+      if (match) {
+        const valStr = lead.dealValue || lead.deal_value || lead.value || lead.budget;
+        let numericVal = 0;
+        if (typeof valStr === 'number') {
+          numericVal = valStr;
+        } else if (typeof valStr === 'string') {
+          const clean = valStr.replace(/[^\d.]/g, '');
+          numericVal = parseFloat(clean) || 0;
+          if (valStr.toLowerCase().includes('cr')) {
+            numericVal = numericVal * 10000000;
+          } else if (valStr.toLowerCase().includes('l')) {
+            numericVal = numericVal * 100000;
+          }
+        }
+        match.value += numericVal;
+      }
+    });
+
+    let runningSum = 0;
+    months.forEach(m => {
+      runningSum += m.value;
+      m.cumulativeValue = runningSum;
+    });
+
+    return months;
+  }, [allLeads, selectedDate, selectedRep, userNameMap]);
+
+  // Targets Metrics progress calculations
+  const targetMetrics = useMemo(() => {
+    const actualValue = filteredLeadsForCharts.reduce((sum, l) => sum + l.value, 0);
+    const actualDeals = filteredLeadsForCharts.length;
+
+    const targetValue = Math.max(actualValue * 1.25, 20000000); 
+    const targetDeals = Math.max(Math.round(actualDeals * 1.3), 10); 
+
+    const valuePct = Math.min(Math.round((actualValue / targetValue) * 100), 100) || 0;
+    const dealsPct = Math.min(Math.round((actualDeals / targetDeals) * 100), 100) || 0;
+
+    return {
+      targetValue,
+      targetDeals,
+      valuePct,
+      dealsPct,
+      actualValue,
+      actualDeals
+    };
+  }, [filteredLeadsForCharts]);
+
+  // Renderers for dynamic SVG-based analytics graphics
+  const renderPipelineActivityTrends = () => {
+    const maxVal = Math.max(...weeklyMetrics.map(w => Math.max(w.hot, w.warm)), 1000000);
+    const getX = (i) => 50 + i * 100;
+    const getY = (val) => 150 - (val / maxVal * 100);
+
+    const hotPath = weeklyMetrics.length > 0 
+      ? `M ${getX(0)} ${getY(weeklyMetrics[0].hot)} ` +
+        `C ${getX(0) + 50} ${getY(weeklyMetrics[0].hot)}, ${getX(1) - 50} ${getY(weeklyMetrics[1].hot)}, ${getX(1)} ${getY(weeklyMetrics[1].hot)} ` +
+        `C ${getX(1) + 50} ${getY(weeklyMetrics[1].hot)}, ${getX(2) - 50} ${getY(weeklyMetrics[2].hot)}, ${getX(2)} ${getY(weeklyMetrics[2].hot)} ` +
+        `C ${getX(2) + 50} ${getY(weeklyMetrics[2].hot)}, ${getX(3) - 50} ${getY(weeklyMetrics[3].hot)}, ${getX(3)} ${getY(weeklyMetrics[3].hot)}`
+      : '';
+
+    const warmPath = weeklyMetrics.length > 0 
+      ? `M ${getX(0)} ${getY(weeklyMetrics[0].warm)} ` +
+        `C ${getX(0) + 50} ${getY(weeklyMetrics[0].warm)}, ${getX(1) - 50} ${getY(weeklyMetrics[1].warm)}, ${getX(1)} ${getY(weeklyMetrics[1].warm)} ` +
+        `C ${getX(1) + 50} ${getY(weeklyMetrics[1].warm)}, ${getX(2) - 50} ${getY(weeklyMetrics[2].warm)}, ${getX(2)} ${getY(weeklyMetrics[2].warm)} ` +
+        `C ${getX(2) + 50} ${getY(weeklyMetrics[2].warm)}, ${getX(3) - 50} ${getY(weeklyMetrics[3].warm)}, ${getX(3)} ${getY(weeklyMetrics[3].warm)}`
+      : '';
+
+    return (
+      <div className="glass-panel" style={{ padding: '20px', background: 'rgba(30, 41, 59, 0.4)' }}>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h4 style={{ fontSize: '15px', color: '#f8fafc', fontWeight: '700' }}>Pipeline Activity Trends</h4>
+            <p className="text-muted" style={{ fontSize: '11px' }}>Weekly Hot vs Warm lead volumes</p>
+          </div>
+          <div className="flex gap-3 text-[11px]">
+            <span className="flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f43f5e' }} />Hot</span>
+            <span className="flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fbbf24' }} />Warm</span>
+          </div>
+        </div>
+
+        <svg width="100%" height="160" viewBox="0 0 400 180" preserveAspectRatio="xMidYMid meet">
+          <line x1="40" y1="50" x2="360" y2="50" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+          <line x1="40" y1="100" x2="360" y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+          <line x1="40" y1="150" x2="360" y2="150" stroke="rgba(255,255,255,0.1)" />
+
+          <path d={hotPath} fill="none" stroke="#f43f5e" strokeWidth="3.5" strokeLinecap="round" />
+          <path d={warmPath} fill="none" stroke="#fbbf24" strokeWidth="3.5" strokeLinecap="round" />
+
+          {weeklyMetrics.map((w, idx) => (
+            <g key={idx}>
+              <circle cx={getX(idx)} cy={getY(w.hot)} r="5" fill="#f43f5e" stroke="#0f172a" strokeWidth="1.5" />
+              <circle cx={getX(idx)} cy={getY(w.warm)} r="5" fill="#fbbf24" stroke="#0f172a" strokeWidth="1.5" />
+              <text x={getX(idx)} y="170" fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="600">{w.name}</text>
+            </g>
+          ))}
+
+          <text x="35" y="54" fill="#64748b" fontSize="9" textAnchor="end">{formatValue(maxVal)}</text>
+          <text x="35" y="104" fill="#64748b" fontSize="9" textAnchor="end">{formatValue(maxVal / 2)}</text>
+          <text x="35" y="154" fill="#64748b" fontSize="9" textAnchor="end">0</text>
+        </svg>
+      </div>
+    );
+  };
+
+  const renderWeeklyValueDistribution = () => {
+    const maxVal = Math.max(...weeklyMetrics.map(w => Math.max(w.hot, w.warm)), 1000000);
+    const getBarHeight = (val) => (val / maxVal) * 100;
+
+    return (
+      <div className="glass-panel" style={{ padding: '20px', background: 'rgba(30, 41, 59, 0.4)' }}>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h4 style={{ fontSize: '15px', color: '#f8fafc', fontWeight: '700' }}>Weekly Value Distribution</h4>
+            <p className="text-muted" style={{ fontSize: '11px' }}>Pipeline valuations group by temperature</p>
+          </div>
+          <div className="flex gap-3 text-[11px]">
+            <span className="flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#f43f5e' }} />Hot</span>
+            <span className="flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#fbbf24' }} />Warm</span>
+          </div>
+        </div>
+
+        <svg width="100%" height="160" viewBox="0 0 400 180" preserveAspectRatio="xMidYMid meet">
+          <line x1="40" y1="50" x2="360" y2="50" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+          <line x1="40" y1="100" x2="360" y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+          <line x1="40" y1="150" x2="360" y2="150" stroke="rgba(255,255,255,0.1)" />
+
+          {weeklyMetrics.map((w, idx) => {
+            const groupX = 40 + idx * 80;
+            const hotH = getBarHeight(w.hot);
+            const warmH = getBarHeight(w.warm);
+            return (
+              <g key={idx}>
+                <rect 
+                  x={groupX + 15} 
+                  y={150 - hotH} 
+                  width="16" 
+                  height={Math.max(hotH, 2)} 
+                  rx="3" 
+                  fill="url(#hotBarGrad)" 
+                  style={{ transition: 'all 0.3s' }}
+                />
+                <rect 
+                  x={groupX + 35} 
+                  y={150 - warmH} 
+                  width="16" 
+                  height={Math.max(warmH, 2)} 
+                  rx="3" 
+                  fill="url(#warmBarGrad)" 
+                  style={{ transition: 'all 0.3s' }}
+                />
+                <text x={groupX + 33} y="170" fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="600">{w.name}</text>
+              </g>
+            );
+          })}
+
+          <text x="35" y="54" fill="#64748b" fontSize="9" textAnchor="end">{formatValue(maxVal)}</text>
+          <text x="35" y="104" fill="#64748b" fontSize="9" textAnchor="end">{formatValue(maxVal / 2)}</text>
+          <text x="35" y="154" fill="#64748b" fontSize="9" textAnchor="end">0</text>
+
+          <defs>
+            <linearGradient id="hotBarGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f43f5e" />
+              <stop offset="100%" stopColor="#be185d" stopOpacity="0.8" />
+            </linearGradient>
+            <linearGradient id="warmBarGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#fbbf24" />
+              <stop offset="100%" stopColor="#b45309" stopOpacity="0.8" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    );
+  };
+
+  const renderCumulativePipelineGrowth = () => {
+    const maxCum = Math.max(...lastSixMonthsCumulative.map(m => m.cumulativeValue), 1000000);
+    const getX = (i) => 45 + i * 64;
+    const getY = (val) => 150 - (val / maxCum * 100);
+
+    let growthPath = '';
+    if (lastSixMonthsCumulative.length > 0) {
+      growthPath = `M ${getX(0)} ${getY(lastSixMonthsCumulative[0].cumulativeValue)}`;
+      for (let i = 1; i < lastSixMonthsCumulative.length; i++) {
+        const xPrev = getX(i - 1);
+        const yPrev = getY(lastSixMonthsCumulative[i - 1].cumulativeValue);
+        const xCurr = getX(i);
+        const yCurr = getY(lastSixMonthsCumulative[i].cumulativeValue);
+        const cpX1 = xPrev + 32;
+        const cpY1 = yPrev;
+        const cpX2 = xCurr - 32;
+        const cpY2 = yCurr;
+        growthPath += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${xCurr} ${yCurr}`;
+      }
+    }
+
+    const areaPath = growthPath 
+      ? `${growthPath} L ${getX(5)} 150 L ${getX(0)} 150 Z`
+      : '';
+
+    return (
+      <div className="glass-panel" style={{ padding: '20px', background: 'rgba(30, 41, 59, 0.4)' }}>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h4 style={{ fontSize: '15px', color: '#f8fafc', fontWeight: '700' }}>Cumulative Pipeline Growth</h4>
+            <p className="text-muted" style={{ fontSize: '11px' }}>Last 6 months cumulative pipeline value</p>
+          </div>
+          <div style={{ fontSize: '11px', color: '#60a5fa', fontWeight: '600' }}>
+            Period Total: {formatValue(lastSixMonthsCumulative[5]?.cumulativeValue || 0)}
+          </div>
+        </div>
+
+        <svg width="100%" height="160" viewBox="0 0 400 180" preserveAspectRatio="xMidYMid meet">
+          <line x1="30" y1="50" x2="380" y2="50" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+          <line x1="30" y1="100" x2="380" y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+          <line x1="30" y1="150" x2="380" y2="150" stroke="rgba(255,255,255,0.1)" />
+
+          <path d={growthPath} fill="none" stroke="#60a5fa" strokeWidth="5" strokeLinecap="round" opacity="0.15" />
+          <path d={areaPath} fill="url(#areaBlueGrad)" opacity="0.3" />
+          <path d={growthPath} fill="none" stroke="#3b82f6" strokeWidth="3.5" strokeLinecap="round" />
+
+          {lastSixMonthsCumulative.map((m, idx) => (
+            <g key={idx}>
+              <circle cx={getX(idx)} cy={getY(m.cumulativeValue)} r="6" fill="#3b82f6" stroke="#0f172a" strokeWidth="2" />
+              <text x={getX(idx)} y="170" fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="600">{m.name}</text>
+            </g>
+          ))}
+
+          <text x="35" y="54" fill="#64748b" fontSize="9" textAnchor="end">{formatValue(maxCum)}</text>
+          <text x="35" y="104" fill="#64748b" fontSize="9" textAnchor="end">{formatValue(maxCum / 2)}</text>
+          <text x="35" y="154" fill="#64748b" fontSize="9" textAnchor="end">0</text>
+
+          <defs>
+            <linearGradient id="areaBlueGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    );
+  };
+
+  const renderRealityVsTarget = () => {
+    const r = 30;
+    const circ = 2 * Math.PI * r; 
+
+    const valueOffset = circ - (targetMetrics.valuePct / 100 * circ);
+    const dealsOffset = circ - (targetMetrics.dealsPct / 100 * circ);
+
+    return (
+      <div className="glass-panel" style={{ padding: '20px', background: 'rgba(30, 41, 59, 0.4)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div>
+          <h4 style={{ fontSize: '15px', color: '#f8fafc', fontWeight: '700' }}>Reality vs Target</h4>
+          <p className="text-muted" style={{ fontSize: '11px', marginBottom: '16px' }}>Current performance vs target benchmarks</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 items-center justify-items-center" style={{ flex: 1, padding: '10px 0' }}>
+          <div className="flex flex-col items-center gap-2">
+            <div style={{ position: 'relative', width: '80px', height: '80px' }}>
+              <svg width="80" height="80" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                <circle 
+                  cx="40" 
+                  cy="40" 
+                  r={r} 
+                  fill="none" 
+                  stroke="#10b981" 
+                  strokeWidth="6" 
+                  strokeDasharray={circ}
+                  strokeDashoffset={dealsOffset}
+                  strokeLinecap="round"
+                  transform="rotate(-90 40 40)"
+                  style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                />
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{targetMetrics.dealsPct}%</span>
+              </div>
+            </div>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8' }}>Deals Target</span>
+            <span style={{ fontSize: '10px', color: '#64748b' }}>({targetMetrics.actualDeals} / {targetMetrics.targetDeals})</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <div style={{ position: 'relative', width: '80px', height: '80px' }}>
+              <svg width="80" height="80" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                <circle 
+                  cx="40" 
+                  cy="40" 
+                  r={r} 
+                  fill="none" 
+                  stroke="#60a5fa" 
+                  strokeWidth="6" 
+                  strokeDasharray={circ}
+                  strokeDashoffset={valueOffset}
+                  strokeLinecap="round"
+                  transform="rotate(-90 40 40)"
+                  style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                />
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{targetMetrics.valuePct}%</span>
+              </div>
+            </div>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8' }}>Valuation Target</span>
+            <span style={{ fontSize: '10px', color: '#64748b' }}>({formatValue(targetMetrics.actualValue)} / {formatValue(targetMetrics.targetValue)})</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Toggle single lead card expanded details
   const toggleLeadExpand = (leadId) => {
     setExpandedLeads(prev => ({
@@ -688,6 +1076,14 @@ export default function ChiefAdminLeadsDashboard() {
                   </div>
                 )
               )}
+
+              {/* Sales Analytics & Insights Graphs Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ marginTop: '16px', marginBottom: '16px' }}>
+                {renderPipelineActivityTrends()}
+                {renderWeeklyValueDistribution()}
+                {renderCumulativePipelineGrowth()}
+                {renderRealityVsTarget()}
+              </div>
 
               {/* Highlight Dashboard Metrics Content (Largest Account + Team Table) */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start" style={{ marginTop: '8px' }}>
