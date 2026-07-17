@@ -41,10 +41,17 @@ const extractList = (response) => {
 };
 
 // Replaces non-numeric characters and parses the deal value as a float
-export const parseDealValue = (val) => {
-  if (val == null || val === '') return 0;
-  const num = parseFloat(String(val).replace(/[^0-9.\-]/g, ''));
-  return isNaN(num) ? 0 : num;
+export const parseDealValue = (value) => {
+  if (value == null || value === '') return 0;
+  if (typeof value === 'number') return value;
+  const str = String(value).toLowerCase().replace(/,/g, '');
+  const numbers = str.match(/\d+(\.\d+)?/g)?.map(Number) || [];
+  if (!numbers.length) return 0;
+  const avg = numbers.length > 1 ? (numbers[0] + numbers[1]) / 2 : numbers[0];
+  if (str.includes('cr')) return avg * 10000000;
+  if (str.includes('lakh') || str.includes('lac') || str.includes(' l')) return avg * 100000;
+  if (avg < 1000) return avg * 10000000; // Assume Crores for small numbers
+  return avg;
 };
 
 // Formats monetary values into Crores (Cr) or Lacs (L) for Indian currency display
@@ -405,19 +412,7 @@ export default function ChiefAdminLeadsDashboard() {
       const match = months.find(m => m.year === leadYear && m.monthIndex === leadMonth);
       if (match) {
         const valStr = lead.dealValue || lead.deal_value || lead.value || lead.budget;
-        let numericVal = 0;
-        if (typeof valStr === 'number') {
-          numericVal = valStr;
-        } else if (typeof valStr === 'string') {
-          const clean = valStr.replace(/[^\d.]/g, '');
-          numericVal = parseFloat(clean) || 0;
-          if (valStr.toLowerCase().includes('cr')) {
-            numericVal = numericVal * 10000000;
-          } else if (valStr.toLowerCase().includes('l')) {
-            numericVal = numericVal * 100000;
-          }
-        }
-        match.value += numericVal;
+        match.value += parseDealValue(valStr);
       }
     });
 
@@ -1367,7 +1362,7 @@ export default function ChiefAdminLeadsDashboard() {
                           
                           <div style={{ textAlign: 'right' }}>
                             <p className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Valuation</p>
-                            <span style={{ fontSize: '18px', fontWeight: '800', color: '#60a5fa' }}>{formatValue(lead.dealValue)}</span>
+                            <span style={{ fontSize: '18px', fontWeight: '800', color: '#60a5fa' }}>{formatValue(lead.value)}</span>
                           </div>
                         </div>
 

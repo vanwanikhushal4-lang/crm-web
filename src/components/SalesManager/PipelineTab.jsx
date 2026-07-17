@@ -32,6 +32,27 @@ import {
   saveMoMDetailsOfCustomer
 } from '../../api/apiFunctions/Login/Login_api_function';
 
+export const parseBudgetToCr = (value) => {
+  if (value == null || value === '') return 0;
+  if (typeof value === 'number') return value;
+  const str = String(value).toLowerCase().replace(/,/g, '');
+  const numbers = str.match(/\d+(\.\d+)?/g)?.map(Number) || [];
+  if (!numbers.length) return 0;
+  const avg = numbers.length > 1 ? (numbers[0] + numbers[1]) / 2 : numbers[0];
+  if (str.includes('cr')) return avg;
+  if (str.includes('lakh') || str.includes('lac') || str.includes(' l')) return avg / 100;
+  if (avg >= 100000) return avg / 10000000;
+  return avg;
+};
+
+export const formatCr = (value, emptyLabel = 'TBD') => {
+  const number = Number(value || 0);
+  if (!number) return emptyLabel;
+  if (number >= 1) return `₹${number.toFixed(number >= 10 ? 0 : 1)} Cr`;
+  if (number >= 0.01) return `₹${Math.round(number * 100)} L`;
+  return `₹${Math.round(number * 10000000).toLocaleString('en-IN')}`;
+};
+
 export default function PipelineTab() {
   const [pipelineType, setPipelineType] = useState('meeting'); // meeting, lead
   const [viewMode, setViewMode] = useState('board'); // board, list
@@ -175,7 +196,7 @@ export default function PipelineTab() {
           m.meetingLogId === lead.id
       ) || {};
 
-      const dealValNum = parseFloat(String(lead.dealValue || '0').replace(/[^0-9.]/g, '')) || 0;
+      const dealValNum = parseBudgetToCr(lead.dealValue || lead.value || lead.budget);
       
       // Follow-up status calculations
       const followUpStr = matchedCust.followUpDate || matchedCust.nextMeetingDate || lead.expectedCloseDate || '';
@@ -603,7 +624,7 @@ export default function PipelineTab() {
         <div className="bg-[#0c1220]/60 border border-white/5 rounded-2xl p-5 hover:border-blue-500/20 transition duration-300">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Active Pipeline</span>
           <h3 className="text-2xl font-extrabold text-white mt-2 font-mono">
-            {metrics.activePipelineVal > 0 ? `${metrics.activePipelineVal.toFixed(1)} Cr` : '0.0 Cr'}
+            {formatCr(metrics.activePipelineVal)}
           </h3>
           <p className="text-[10px] text-slate-500 mt-1 font-medium">Excluding won & lost deals</p>
         </div>
@@ -619,7 +640,7 @@ export default function PipelineTab() {
         <div className="bg-[#0c1220]/60 border border-white/5 rounded-2xl p-5 hover:border-emerald-500/20 transition duration-300">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Revenue Won</span>
           <h3 className="text-2xl font-extrabold text-white mt-2 font-mono">
-            {metrics.revenueWon > 0 ? `${metrics.revenueWon.toFixed(1)} Cr` : '0.0 Cr'}
+            {formatCr(metrics.revenueWon)}
           </h3>
           <p className="text-[10px] text-emerald-400 mt-1 font-medium">Won deal budgets</p>
         </div>
@@ -839,7 +860,7 @@ export default function PipelineTab() {
                       </div>
 
                       <div className="flex justify-between items-center mt-3 text-xs">
-                        <span className="text-emerald-400 font-bold font-mono">{lead.dealValue > 0 ? `${parseFloat(lead.dealValue).toFixed(1)} Cr` : 'TBD'}</span>
+                        <span className="text-emerald-400 font-bold font-mono">{formatCr(lead.dealValueNumeric)}</span>
                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
                           lead.priority === 'HIGH'
                             ? 'bg-red-500/10 text-red-400 border border-red-500/15'
@@ -891,7 +912,7 @@ export default function PipelineTab() {
                   </div>
 
                   <div className="flex items-center gap-4 text-xs font-semibold self-stretch sm:self-auto justify-between sm:justify-end">
-                    <span className="text-emerald-400 font-bold font-mono">{lead.dealValue > 0 ? `${parseFloat(lead.dealValue).toFixed(1)} Cr` : 'TBD'}</span>
+                    <span className="text-emerald-400 font-bold font-mono">{formatCr(lead.dealValueNumeric)}</span>
                     <span className="bg-slate-800 text-slate-300 px-3 py-1 rounded-full uppercase text-[9px] font-bold">
                       {lead.stage.replace('_', ' ')}
                     </span>
@@ -1341,7 +1362,7 @@ export default function PipelineTab() {
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4">
                   <div>
                     <span className="text-slate-500">Estimated Value:</span>
-                    <p className="font-extrabold text-emerald-400 mt-0.5">{selectedLead.dealValue > 0 ? `${parseFloat(selectedLead.dealValue).toFixed(1)} Cr` : 'TBD'}</p>
+                    <p className="font-extrabold text-emerald-400 mt-0.5">{formatCr(selectedLead.dealValueNumeric)}</p>
                   </div>
                   <div>
                     <span className="text-slate-500">Expected Close Date:</span>

@@ -31,6 +31,8 @@ import {
   saveOrUpdateCall
 } from '../../api/apiFunctions/Login/Login_api_function';
 
+import { parseBudgetToCr, formatCr } from './PipelineTab';
+
 export default function ContactsTab() {
   const [contacts, setContacts] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -923,7 +925,7 @@ export default function ContactsTab() {
 
                   <div className="border-t border-white/5 pt-2 mt-2 flex justify-between text-[10px] text-slate-500 font-mono">
                     <span>Products: {mom.productSuitPitched || 'None'}</span>
-                    <span>Value: {mom.dealValue ? `${mom.dealValue} Cr` : 'TBD'}</span>
+                    <span>Value: {formatCr(parseBudgetToCr(mom.dealValue))}</span>
                   </div>
                 </div>
               ))}
