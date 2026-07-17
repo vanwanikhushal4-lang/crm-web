@@ -31,6 +31,8 @@ import {
   saveMoMDetailsOfCustomer
 } from '../../api/apiFunctions/Login/Login_api_function';
 
+import { parseBudgetToCr, formatCr } from './PipelineTab';
+
 export default function CommandCenter({
   setActiveTab,
   setShowAddLeadModal
@@ -372,7 +374,7 @@ export default function CommandCenter({
   const getHotPipelineDeals = () => {
     return rawLeads
       .filter((l) => {
-        const valNum = parseFloat(String(l.dealValue || '0').replace(/[^0-9.]/g, '')) || 0;
+        const valNum = parseBudgetToCr(l.dealValue || l.value || l.budget);
         const isAdvanced = ['PROPOSAL_SENT', 'NEGOTIATION', 'WON'].includes(l.stage);
         const isHot = l.priority === 'HIGH' || isAdvanced || valNum > 1.0;
         return isHot;
@@ -382,7 +384,7 @@ export default function CommandCenter({
         customerName: lead.contactName || 'Unassigned',
         companyName: lead.company || 'Unknown Company',
         stage: lead.stage || 'NEW_LEAD',
-        value: lead.dealValue > 0 ? `${parseFloat(lead.dealValue).toFixed(1)} Cr` : 'TBD',
+        value: formatCr(parseBudgetToCr(lead.dealValue || lead.value || lead.budget)),
         raw: lead
       }));
   };
