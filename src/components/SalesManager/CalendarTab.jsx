@@ -36,7 +36,9 @@ import {
   getAttachmentForMeeting,
   uploadMeetingAttachment,
   saveMoMDetailsOfCustomer,
-  getAllMomDetails
+  getAllMomDetails,
+  getAllProducts,
+  getAllMomDetailsByCurrentUser
 } from '../../api/apiFunctions/Login/Login_api_function';
 
 export default function CalendarTab() {
@@ -145,6 +147,8 @@ export default function CalendarTab() {
     isScheduled: false
   });
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const [geoLocation, setGeoLocation] = useState('Location unavailable');
+  const [showMomForm, setShowMomForm] = useState(false);
 
   // Task Log
   const [taskForm, setTaskForm] = useState({
@@ -171,6 +175,22 @@ export default function CalendarTab() {
 
   // MOM Form state (inside Action Overlay)
   const [momNotes, setMomNotes] = useState('');
+  const [productsCatalog, setProductsCatalog] = useState([]);
+  const [momForm, setMomForm] = useState({
+    productsPitched: [],
+    budget: '',
+    timeline: '0-3 Months',
+    leadType: 'Warm',
+    isInterested: true,
+    competitorsMentioned: '',
+    alreadyPitchedToOrg: false,
+    pitchedToWhom: '',
+    pitchedByWhom: '',
+    currentBlockers: '',
+    nextStep: 'Technical Discussion',
+    followUpDate: ''
+  });
+  const [currentUserMoms, setCurrentUserMoms] = useState([]);
 
   // Fetch logged in salesperson name
   useEffect(() => {
@@ -218,6 +238,15 @@ export default function CalendarTab() {
         setCalls(callsRes);
       }
 
+      // Get products list
+      const productsRes = await getAllProducts().catch(() => []);
+      const prodArr = Array.isArray(productsRes?.data) ? productsRes.data : Array.isArray(productsRes) ? productsRes : [];
+      setProductsCatalog(prodArr);
+
+      // Get MOMs for current user
+      const momsRes = await getAllMomDetailsByCurrentUser().catch(() => []);
+      const momsArr = Array.isArray(momsRes?.data) ? momsRes.data : Array.isArray(momsRes) ? momsRes : [];
+      setCurrentUserMoms(momsArr);
     } catch (error) {
       console.error('Error fetching calendar API data:', error);
     } finally {
@@ -228,6 +257,117 @@ export default function CalendarTab() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Sync selectedMeeting values to momForm when selectedMeeting changes
+  useEffect(() => {
+    if (selectedMeeting) {
+      const initProducts = selectedMeeting.pitchedProducts 
+        ? [selectedMeeting.pitchedProducts] 
+        : selectedMeeting.product 
+        ? [selectedMeeting.product] 
+        : [];
+      
+      setMomNotes(selectedMeeting.notes || selectedMeeting.momDescription || '');
+      
+      setMomForm({
+        productsPitched: initProducts,
+        budget: selectedMeeting.dealValue || selectedMeeting.budget || '',
+        timeline: selectedMeeting.timeline || '0-3 Months',
+        leadType: selectedMeeting.priority || selectedMeeting.leadType || 'Warm',
+        isInterested: selectedMeeting.isInterested !== undefined ? selectedMeeting.isInterested : true,
+        competitorsMentioned: selectedMeeting.competitors || '',
+        alreadyPitchedToOrg: selectedMeeting.alreadyPitched !== undefined ? selectedMeeting.alreadyPitched : false,
+        pitchedToWhom: selectedMeeting.contactPersonName || selectedMeeting.contactPerson || '',
+        pitchedByWhom: username || 'Sales Manager',
+        currentBlockers: selectedMeeting.blockers || '',
+        nextStep: selectedMeeting.nextStep || 'Technical Discussion',
+        followUpDate: selectedMeeting.followUpDate ? getLocalDatetimeString(selectedMeeting.followUpDate).slice(0, 10) : ''
+      });
+    } else {
+      setMomNotes('');
+      setMomForm({
+        productsPitched: [],
+        budget: '',
+        timeline: '0-3 Months',
+        leadType: 'Warm',
+        isInterested: true,
+        competitorsMentioned: '',
+        alreadyPitchedToOrg: false,
+        pitchedToWhom: '',
+        pitchedByWhom: '',
+        currentBlockers: '',
+        nextStep: 'Technical Discussion',
+        followUpDate: ''
+      });
+    }
+  }, [selectedMeeting, username]);
+
+  // Product selection handler for MOM form
+  const handleMOMProductCheck = (label) => {
+    const isChecked = momForm.productsPitched.includes(label);
+    if (isChecked) {
+      setMomForm((prev) => ({
+        ...prev,
+        productsPitched: prev.productsPitched.filter((p) => p !== label)
+      }));
+    } else {
+      setMomForm((prev) => ({
+        ...prev,
+        productsPitched: [...prev.productsPitched, label]
+      }));
+    }
+  };
+
+  // Check if MoM is completed for a meeting
+  const isMomCompleted = (meeting) => {
+    if (!meeting) return false;
+    
+    // Gather all possible meeting identifiers
+    const meetingIds = [
+      meeting.meetingId,
+      meeting.plannedMeetingId,
+      meeting.meetingLogId,
+      meeting.logId,
+      meeting.id
+    ].map(id => String(id || '')).filter(Boolean);
+
+    // 1. Match by meeting identifiers
+    if (meetingIds.length > 0) {
+      const matchedById = currentUserMoms.some((mom) => {
+        const momMeetingIds = [
+          mom.meetingId,
+          mom.meeting_id,
+          mom.plannedMeetingId,
+          mom.planned_meeting_id,
+          mom.meetingLogId,
+          mom.meeting_log_id
+        ].map(id => String(id || '')).filter(Boolean);
+
+        // Also check if mom has meetingIds array
+        if (Array.isArray(mom.meetingIds)) {
+          mom.meetingIds.forEach((id) => {
+            if (id) momMeetingIds.push(String(id));
+          });
+        }
+
+        return momMeetingIds.some(momId => meetingIds.includes(momId));
+      });
+      
+      if (matchedById) return true;
+    }
+
+    // 2. Match by customer name / company name (fallback)
+    const mCompName = (meeting.companyName || meeting.name || '').toLowerCase().trim();
+    if (mCompName) {
+      const matchedByName = currentUserMoms.some((mom) => {
+        const momCompName = (mom.customerName || mom.companyName || '').toLowerCase().trim();
+        return momCompName === mCompName;
+      });
+      if (matchedByName) return true;
+    }
+
+    return false;
+  };
 
   // Fetch attachments when a meeting is selected
   const fetchAttachments = async (meeting) => {
@@ -438,6 +578,7 @@ export default function CalendarTab() {
             longitude: longitude
           };
           await meetingCheckIn(payload);
+          setGeoLocation(`${latitude}, ${longitude}`);
           alert('Checked into meeting successfully!');
         } catch (error) {
           alert('Check-in failed: ' + (error?.response?.data?.message || error.message));
@@ -468,20 +609,83 @@ export default function CalendarTab() {
     }
   };
 
+  const getStageNumber = (stageVal) => {
+    if (!stageVal) return 1;
+    if (typeof stageVal === 'number') return stageVal;
+    const clean = String(stageVal).toUpperCase().replace(/[\s-]+/g, '_');
+    const mapping = {
+      NEW_LEAD: 1,
+      INITIAL_CONTACT: 1,
+      CONTACTED: 2,
+      TECH_DISCUSSION: 2,
+      QUALIFIED: 3,
+      DEMO: 3,
+      PROPOSAL_SENT: 4,
+      PROPOSAL: 4,
+      NEGOTIATION: 5,
+      WON: 6,
+      LOST: 7
+    };
+    return mapping[clean] || 1;
+  };
+
   // Submit MOM form details
   const handleMOMSubmit = async (e) => {
     e.preventDefault();
     try {
       const payload = {
+        account_id: String(selectedMeeting?.customerId || ''),
+        salesman_id: String(localStorage.getItem('userId') || selectedMeeting?.createdBy || '2'),
+        engagement_type: selectedMeeting?.meetingId ? 'Planned' : 'Ad-hoc',
+        stage: getStageNumber(selectedMeeting?.stage),
+        geoLocation: geoLocation || 'Location unavailable',
+        
+        // Root fields for compatibility/logging
         companyName: selectedMeeting?.companyName || selectedMeeting?.name || '',
         contactPersonName: selectedMeeting?.contactPersonName || selectedMeeting?.contactPerson || '',
         momDescription: momNotes,
-        meetingLogId: selectedMeeting?.meetingLogId || selectedMeeting?.id || null
+        
+        pitch_details: {
+          products_pitched: momForm.productsPitched,
+          budget: momForm.budget || 'TBD',
+          timeline: momForm.timeline || '0-3 Months',
+          lead_type: momForm.leadType || 'Warm',
+          is_interested: momForm.isInterested
+        },
+        
+        competition_and_history: {
+          competitors_mentioned: momForm.competitorsMentioned || 'None',
+          already_pitched_to_org: momForm.alreadyPitchedToOrg,
+          pitched_to_whom: momForm.pitchedToWhom || 'Unassigned',
+          pitched_by_whom: momForm.pitchedByWhom || username || 'Sales Manager',
+          current_blockers: momForm.currentBlockers || 'None'
+        },
+        
+        outcome: {
+          next_step: momForm.nextStep || 'Technical Discussion',
+          follow_up_date: momForm.followUpDate ? new Date(momForm.followUpDate).toISOString() : null,
+          notes: momNotes
+        }
       };
+
+      if (selectedMeeting?.meetingId) {
+        payload.meetingId = String(selectedMeeting.meetingId);
+        payload.meeting_id = String(selectedMeeting.meetingId);
+        payload.plannedMeetingId = String(selectedMeeting.meetingId);
+      }
+      const mLogId = selectedMeeting?.meetingLogId || selectedMeeting?.logId || selectedMeeting?.id;
+      if (mLogId) {
+        payload.meetingLogId = String(mLogId);
+        payload.meeting_log_id = String(mLogId);
+      }
+
       await saveMoMDetailsOfCustomer(payload);
       alert('MOM Details submitted successfully!');
       setMomNotes('');
+      setGeoLocation('Location unavailable');
+      setShowMomForm(false);
       setShowActionOverlay(false);
+      fetchData(); // Refresh data to display the update
     } catch (error) {
       alert('MOM Submission failed: ' + (error?.response?.data?.message || error.message));
     }
@@ -849,6 +1053,12 @@ export default function CalendarTab() {
                             {meeting.contactPersonName}
                           </span>
                         )}
+                        {isMomCompleted(meeting) && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                            <CheckCircle className="h-3 w-3" />
+                            Completed
+                          </span>
+                        )}
                       </div>
                       
                       <div className="flex items-center gap-3 text-xs text-slate-400">
@@ -865,9 +1075,15 @@ export default function CalendarTab() {
                       </div>
                     </div>
 
-                    <div className="text-xs text-blue-400 font-semibold flex items-center gap-1 group">
-                      Log MOM / Check In <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" />
-                    </div>
+                    {isMomCompleted(meeting) ? (
+                      <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                        MOM Submitted ✓
+                      </div>
+                    ) : (
+                      <div className="text-xs text-blue-400 font-semibold flex items-center gap-1 group">
+                        Log MOM / Check In <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" />
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -1192,7 +1408,8 @@ export default function CalendarTab() {
                     type="datetime-local"
                     value={meetingForm.startTime}
                     onChange={(e) => setMeetingForm({ ...meetingForm, startTime: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
+                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-150 cursor-pointer"
+                    style={{ colorScheme: 'dark' }}
                     required
                   />
                 </div>
@@ -1202,7 +1419,8 @@ export default function CalendarTab() {
                     type="datetime-local"
                     value={meetingForm.endTime}
                     onChange={(e) => setMeetingForm({ ...meetingForm, endTime: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
+                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-150 cursor-pointer"
+                    style={{ colorScheme: 'dark' }}
                     required
                   />
                 </div>
@@ -1559,6 +1777,7 @@ export default function CalendarTab() {
               setSelectedMeeting(null);
               setAttachments([]);
               setMomNotes('');
+              setShowMomForm(false);
             }
           }}
           className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
@@ -1583,6 +1802,7 @@ export default function CalendarTab() {
                   setSelectedMeeting(null);
                   setAttachments([]);
                   setMomNotes('');
+                  setShowMomForm(false);
                 }}
                 className="text-slate-400 hover:text-white"
               >
@@ -1646,27 +1866,245 @@ export default function CalendarTab() {
 
             {/* ACTION 3: MINUTES OF MEETING FORM */}
             <div className="bg-slate-900/40 p-4 rounded-xl border border-white/5 space-y-3">
-              <span className="text-xs font-bold text-slate-200 flex items-center gap-1 border-b border-white/5 pb-2">
-                <FileText className="h-3.5 w-3.5 text-indigo-400" />
-                3. Fill Minutes of Meeting (MOM)
+              <span className="text-xs font-bold text-slate-200 flex items-center justify-between border-b border-white/5 pb-2">
+                <span className="flex items-center gap-1">
+                  <FileText className="h-3.5 w-3.5 text-indigo-400" />
+                  3. Fill Minutes of Meeting (MOM)
+                </span>
+                {isMomCompleted(selectedMeeting) && (
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    MOM Submitted ✓
+                  </span>
+                )}
               </span>
 
-              <form onSubmit={handleMOMSubmit} className="space-y-3">
-                <textarea
-                  rows="3"
-                  placeholder="Type meeting discussion summary, decisions, next steps..."
-                  value={momNotes}
-                  onChange={(e) => setMomNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/5 text-xs text-slate-100 focus:outline-none focus:border-blue-500 resize-none"
-                  required
-                ></textarea>
+              {!showMomForm ? (
                 <button
-                  type="submit"
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-bold shadow-md transition"
+                  onClick={() => setShowMomForm(true)}
+                  className="w-full py-2 bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow"
                 >
-                  SUBMIT MOM SUMMARIES
+                  <FileText className="h-4 w-4" />
+                  {isMomCompleted(selectedMeeting) ? 'Update MOM Details' : 'Fill MOM Details'}
                 </button>
-              </form>
+              ) : (
+                <form onSubmit={handleMOMSubmit} className="space-y-4 animate-fade text-left">
+                  
+                  {/* Section: Pitch Details */}
+                  <div className="space-y-2.5">
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 border-b border-white/5 pb-1">
+                      Pitch Details
+                    </div>
+                    
+                    {/* Pitched Products Checklist */}
+                    <div>
+                      <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Pitched Products</label>
+                      <div className="grid grid-cols-2 gap-1.5 bg-slate-950/60 p-2.5 rounded-lg border border-white/5 max-h-24 overflow-y-auto hide-scrollbar">
+                        {productsCatalog.map((prod, idx) => {
+                          const label = prod.name || prod.label || prod;
+                          const isChecked = momForm.productsPitched.includes(label);
+                          return (
+                            <label key={idx} className="flex items-center gap-1.5 text-[10px] text-slate-300 hover:text-white cursor-pointer select-none transition">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleMOMProductCheck(label)}
+                                className="rounded bg-slate-900 border-white/10 text-indigo-600 focus:ring-0 h-3.5 w-3.5"
+                              />
+                              {label}
+                            </label>
+                          );
+                        })}
+                        {productsCatalog.length === 0 && (
+                          <p className="text-[9px] text-slate-500 italic col-span-2">No products available</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Budget & Timeline */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Budget</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 1-5 Cr"
+                          value={momForm.budget}
+                          onChange={(e) => setMomForm({ ...momForm, budget: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Timeline</label>
+                        <select
+                          value={momForm.timeline}
+                          onChange={(e) => setMomForm({ ...momForm, timeline: e.target.value })}
+                          className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition"
+                        >
+                          <option value="0-3 Months">0-3 Months</option>
+                          <option value="3-6 Months">3-6 Months</option>
+                          <option value="6 Months">6 Months</option>
+                          <option value="6-12 Months">6-12 Months</option>
+                          <option value="12 Months+">12 Months+</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Lead Type & Interested flag */}
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Lead Type</label>
+                        <select
+                          value={momForm.leadType}
+                          onChange={(e) => setMomForm({ ...momForm, leadType: e.target.value })}
+                          className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition"
+                        >
+                          <option value="Cold">Cold</option>
+                          <option value="Warm">Warm</option>
+                          <option value="Hot">Hot</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-4">
+                        <input
+                          type="checkbox"
+                          id="momIsInterested"
+                          checked={momForm.isInterested}
+                          onChange={(e) => setMomForm({ ...momForm, isInterested: e.target.checked })}
+                          className="rounded bg-slate-950 border-white/10 text-indigo-600 focus:ring-0 h-3.5 w-3.5 cursor-pointer"
+                        />
+                        <label htmlFor="momIsInterested" className="text-[11px] text-slate-300 cursor-pointer select-none font-semibold">
+                          Client Interested?
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section: Competition & History */}
+                  <div className="space-y-2.5 pt-1">
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 border-b border-white/5 pb-1">
+                      Competition & History
+                    </div>
+
+                    {/* Competitors & Blockers */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Competitors</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Tata Tech, LexCorp"
+                          value={momForm.competitorsMentioned}
+                          onChange={(e) => setMomForm({ ...momForm, competitorsMentioned: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Blockers</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Legal team approval"
+                          value={momForm.currentBlockers}
+                          onChange={(e) => setMomForm({ ...momForm, currentBlockers: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Pitched To & Pitched By */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Pitched To Whom</label>
+                        <input
+                          type="text"
+                          placeholder="Contact person"
+                          value={momForm.pitchedToWhom}
+                          onChange={(e) => setMomForm({ ...momForm, pitchedToWhom: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Pitched By Whom</label>
+                        <input
+                          type="text"
+                          placeholder="Sales rep name"
+                          value={momForm.pitchedByWhom}
+                          onChange={(e) => setMomForm({ ...momForm, pitchedByWhom: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Already pitched */}
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        id="momAlreadyPitched"
+                        checked={momForm.alreadyPitchedToOrg}
+                        onChange={(e) => setMomForm({ ...momForm, alreadyPitchedToOrg: e.target.checked })}
+                        className="rounded bg-slate-950 border-white/10 text-indigo-600 focus:ring-0 h-3.5 w-3.5 cursor-pointer"
+                      />
+                      <label htmlFor="momAlreadyPitched" className="text-[11px] text-slate-300 cursor-pointer select-none font-semibold">
+                        Already Pitched to Organization?
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Section: Outcome & Notes */}
+                  <div className="space-y-2.5 pt-1">
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 border-b border-white/5 pb-1">
+                      Outcome & Notes
+                    </div>
+
+                    {/* Next step & Follow Up */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Next Step</label>
+                        <select
+                          value={momForm.nextStep}
+                          onChange={(e) => setMomForm({ ...momForm, nextStep: e.target.value })}
+                          className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition"
+                        >
+                          <option value="Technical Discussion">Technical Discussion</option>
+                          <option value="Demo">Demo</option>
+                          <option value="POC Request">POC Request</option>
+                          <option value="Proposal">Proposal</option>
+                          <option value="Negotiations">Negotiations</option>
+                          <option value="Closure">Closure</option>
+                          <option value="Won">Won</option>
+                          <option value="Lost">Lost</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Follow Up Date</label>
+                        <input
+                          type="date"
+                          value={momForm.followUpDate}
+                          onChange={(e) => setMomForm({ ...momForm, followUpDate: e.target.value })}
+                          className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-150 cursor-pointer"
+                          style={{ colorScheme: 'dark' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes text area */}
+                    <div>
+                      <label className="text-[11px] text-slate-400 font-semibold mb-1 block">MOM Discussion Summary</label>
+                      <textarea
+                        rows="3"
+                        placeholder="Type meeting discussion summary, decisions, next steps..."
+                        value={momNotes}
+                        onChange={(e) => setMomNotes(e.target.value)}
+                        className="w-full px-3 py-2 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-100 focus:outline-none focus:border-indigo-500 resize-none transition"
+                        required
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-lg transition-all"
+                  >
+                    SUBMIT MOM DETAILS
+                  </button>
+                </form>
+              )}
             </div>
 
           </div>

@@ -446,6 +446,16 @@ export const getAllMomDetails = async () => {
   }
 };
 
+export const getAllMomDetailsByCurrentUser = async () => {
+  try {
+    const res = await apiMethods.get(`${CUSTOMER_MASTER_BASE_URL}/customerMaster/getAllMomDetailsByCurrentUser`);
+    return res;
+  } catch (error) {
+    console.error('Get MOM Details By Current User API Error:', error);
+    throw error;
+  }
+};
+
 export const saveTargetDetails = async (payload) => {
   try {
     const res = await apiMethods.post('/Target/saveTargetDetails', payload);
