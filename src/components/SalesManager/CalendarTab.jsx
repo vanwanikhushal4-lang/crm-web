@@ -47,8 +47,21 @@ export default function CalendarTab() {
 
   const scrollContainerRef = useRef(null);
 
-  // Selected date state
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const getLocalDatetimeString = (date, hours = 9) => {
+    const localDate = new Date(date);
+    localDate.setHours(hours, 0, 0, 0);
+    const tzoffset = localDate.getTimezoneOffset() * 60000;
+    return new Date(localDate - tzoffset).toISOString().slice(0, 16);
+  };
+
+  const getLocalDateString = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
 
   // Scroll active date button into view when selected date changes
   useEffect(() => {
@@ -778,10 +791,7 @@ export default function CalendarTab() {
           <div className="bg-[#0b1628]/40 border border-white/5 rounded-2xl overflow-hidden shadow">
             
             {/* Header section */}
-            <button
-              onClick={() => setCollapseMeetings(!collapseMeetings)}
-              className="w-full flex justify-between items-center px-5 py-4 bg-slate-900/30 border-b border-white/5 hover:bg-slate-900/40 transition text-left"
-            >
+            <div className="w-full flex justify-between items-center px-5 py-4 bg-slate-900/30 border-b border-white/5">
               <div className="flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4 text-blue-400" />
                 <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
@@ -791,8 +801,30 @@ export default function CalendarTab() {
                   {displayMeetings.length}
                 </span>
               </div>
-              {collapseMeetings ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-400" />}
-            </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      startTime: getLocalDatetimeString(selectedDate, 9),
+                      endTime: getLocalDatetimeString(selectedDate, 10)
+                    }));
+                    setShowMeetingModal(true);
+                  }}
+                  className="px-2.5 py-1 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-blue-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 animate-fade shadow"
+                  title="Log Meeting"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Log Meeting</span>
+                </button>
+                <button
+                  onClick={() => setCollapseMeetings(!collapseMeetings)}
+                  className="p-1 text-slate-400 hover:text-white transition"
+                >
+                  {collapseMeetings ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4 animate-fade" />}
+                </button>
+              </div>
+            </div>
 
             {/* List block */}
             {!collapseMeetings && (
@@ -846,8 +878,8 @@ export default function CalendarTab() {
                       onClick={() => {
                         setMeetingForm((prev) => ({
                           ...prev,
-                          startTime: new Date(selectedDate.setHours(9, 0, 0)).toISOString().slice(0, 16),
-                          endTime: new Date(selectedDate.setHours(10, 0, 0)).toISOString().slice(0, 16)
+                          startTime: getLocalDatetimeString(selectedDate, 9),
+                          endTime: getLocalDatetimeString(selectedDate, 10)
                         }));
                         setShowMeetingModal(true);
                       }}
@@ -867,10 +899,7 @@ export default function CalendarTab() {
         {(filterType === 'All' || filterType === 'Tasks') && (
           <div className="bg-[#0b1628]/40 border border-white/5 rounded-2xl overflow-hidden shadow">
             
-            <button
-              onClick={() => setCollapseTasks(!collapseTasks)}
-              className="w-full flex justify-between items-center px-5 py-4 bg-slate-900/30 border-b border-white/5 hover:bg-slate-900/40 transition text-left"
-            >
+            <div className="w-full flex justify-between items-center px-5 py-4 bg-slate-900/30 border-b border-white/5">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-emerald-400" />
                 <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
@@ -880,8 +909,29 @@ export default function CalendarTab() {
                   {displayTasks.length}
                 </span>
               </div>
-              {collapseTasks ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-400" />}
-            </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setTaskForm((prev) => ({
+                      ...prev,
+                      dueDate: getLocalDateString(selectedDate)
+                    }));
+                    setShowTaskModal(true);
+                  }}
+                  className="px-2.5 py-1 bg-emerald-600/10 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 animate-fade shadow"
+                  title="Create Task"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Create Task</span>
+                </button>
+                <button
+                  onClick={() => setCollapseTasks(!collapseTasks)}
+                  className="p-1 text-slate-400 hover:text-white transition"
+                >
+                  {collapseTasks ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4 animate-fade" />}
+                </button>
+              </div>
+            </div>
 
             {!collapseTasks && (
               <div className="p-4 space-y-3">
@@ -925,7 +975,7 @@ export default function CalendarTab() {
                       onClick={() => {
                         setTaskForm((prev) => ({
                           ...prev,
-                          dueDate: selectedDate.toISOString().split('T')[0]
+                          dueDate: getLocalDateString(selectedDate)
                         }));
                         setShowTaskModal(true);
                       }}
