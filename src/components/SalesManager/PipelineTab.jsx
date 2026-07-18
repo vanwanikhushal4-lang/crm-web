@@ -534,7 +534,7 @@ export default function PipelineTab() {
         advancedFilters.leadSource === '' ||
         row.leadSource.toLowerCase() === advancedFilters.leadSource.toLowerCase();
 
-      return matchQuery && matchStage && matchSegment && matchAdvancedProduct && matchAdvancedSource;
+      return matchQuery && matchStage && matchAdvancedProduct && matchAdvancedSource;
     })
     .sort((a, b) => {
       // Sort logic
@@ -621,60 +621,34 @@ export default function PipelineTab() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0b1628]/60 border border-white/5 p-5 rounded-2xl shadow-lg">
         <div>
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent flex items-center gap-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${pipelineType === 'meeting' ? 'bg-blue-500' : 'bg-rose-500'}`}></span>
-            {pipelineType === 'meeting' ? 'Meeting Pipeline' : 'Leads Pipeline'}
+            <span className="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
+            Pipeline Dashboard
           </h1>
           <p className="text-xs text-slate-400 font-mono mt-0.5">{getFormattedDate()}</p>
         </div>
 
         {/* Header Actions */}
         <div className="flex items-center gap-2">
-          {pipelineType === 'meeting' && (
-            <>
-              <button
-                onClick={handleExportCSV}
-                className="px-4 py-2 bg-slate-900/60 border border-white/5 hover:border-blue-500/20 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow"
-                title="Export filtered CSV"
-              >
-                <Download className="h-4 w-4" />
-                Export CSV
-              </button>
-              
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg"
-              >
-                <Plus className="h-4 w-4" />
-                Add Lead
-              </button>
-            </>
-          )}
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2 bg-slate-900/60 border border-white/5 hover:border-blue-500/20 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow"
+            title="Export filtered CSV"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+          
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg"
+          >
+            <Plus className="h-4 w-4" />
+            Add Lead
+          </button>
         </div>
       </div>
 
-      {/* PIPELINE SEGMENT SELECTOR */}
-      <div className="flex bg-[#0c1220]/60 p-1 rounded-xl border border-white/5 w-fit shrink-0">
-        <button
-          onClick={() => setPipelineType('meeting')}
-          className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${
-            pipelineType === 'meeting'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          Meeting Pipeline
-        </button>
-        <button
-          onClick={() => setPipelineType('lead')}
-          className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${
-            pipelineType === 'lead'
-              ? 'bg-rose-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          Leads Pipeline
-        </button>
-      </div>
+      {/* Segment Selector Removed - Showing All Leads */}
 
       {/* PIPELINE METRICS & ANALYTICS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
