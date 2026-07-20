@@ -153,6 +153,7 @@ export default function CalendarTab() {
 
   // Task Log
   const [taskForm, setTaskForm] = useState({
+    id: null,
     subject: '',
     dueDate: '',
     status: 'NOT_STARTED',
@@ -501,6 +502,30 @@ export default function CalendarTab() {
     return `Customer #${c.id || c.customerId || 'Entry'}`;
   };
 
+  // Helper to resolve call customer display name
+  const getCallCustomerName = (call) => {
+    if (!call) return 'N/A';
+    if (call.customerName) return call.customerName;
+    if (typeof call.customer === 'string' && call.customer.trim()) return call.customer.trim();
+    if (call.customer && typeof call.customer === 'object') {
+      const name = getCustomerDisplayName(call.customer);
+      if (name) return name;
+    }
+    if (call.customerId && customers && customers.length > 0) {
+      const found = customers.find((c) => String(c.id) === String(call.customerId));
+      if (found) return getCustomerDisplayName(found);
+    }
+    if (call.companyName) return call.companyName;
+    return 'N/A';
+  };
+
+  // Helper to resolve call category
+  const getCallCategory = (call) => {
+    if (!call) return 'LEADS';
+    const cat = call.relatedTo || call.category || call.related_to || 'LEADS';
+    return String(cat).toUpperCase();
+  };
+
   // Form autocomplete handlers
   const handleCompanyChange = (val) => {
     setCompanySearch(val);
@@ -598,10 +623,14 @@ export default function CalendarTab() {
         status: taskForm.status,
         priority: taskForm.priority
       };
+      if (taskForm.id) {
+        payload.id = taskForm.id;
+        payload.taskLogId = taskForm.id;
+      }
       await saveOrUpdateTaskLog(payload);
-      alert('Task log saved successfully!');
+      alert(taskForm.id ? 'Task log updated successfully!' : 'Task log saved successfully!');
       setShowTaskModal(false);
-      setTaskForm({ subject: '', dueDate: '', status: 'NOT_STARTED', priority: 'NORMAL' });
+      setTaskForm({ id: null, subject: '', dueDate: '', status: 'NOT_STARTED', priority: 'NORMAL' });
       fetchData();
     } catch (error) {
       alert('Error saving task: ' + (error?.response?.data?.message || error.message));
@@ -1153,65 +1182,111 @@ export default function CalendarTab() {
               </div>
             </div>
 
-            {/* List block */}
+            {/* Table block for Meetings */}
             {!collapseMeetings && (
-              <div className="p-4 space-y-3">
-                {displayMeetings.map((meeting) => (
-                  <div
-                    key={meeting.id || meeting.meetingLogId}
-                    onClick={() => {
-                      setSelectedMeeting(meeting);
-                      fetchAttachments(meeting);
-                      setShowActionOverlay(true);
-                    }}
-                    className="p-4 bg-slate-900/50 hover:bg-slate-900/80 rounded-xl border border-white/5 hover:border-blue-500/25 transition cursor-pointer flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-                  >
-                    <div className="space-y-1.5 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-slate-100 text-sm">
-                          {meeting.companyName || meeting.name || 'Client Visit'}
-                        </h4>
-                        {meeting.contactPersonName && (
-                          <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">
-                            {meeting.contactPersonName}
-                          </span>
-                        )}
-                        {isMomCompleted(meeting) && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                            <CheckCircle className="h-3 w-3" />
-                            Completed
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-3 text-xs text-slate-400">
-                        <span className="flex items-center gap-1 font-mono text-[11px]">
-                          <Clock className="h-3.5 w-3.5 text-blue-400" />
-                          {meeting.startTime ? new Date(meeting.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Flexible'}
-                        </span>
-                        {meeting.locationName && (
-                          <span className="flex items-center gap-1 truncate max-w-sm">
-                            <MapPin className="h-3.5 w-3.5 text-emerald-400" />
-                            {meeting.locationName}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+              <div className="overflow-x-auto">
+                {displayMeetings.length > 0 ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-slate-900/50 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="py-3.5 px-5">Company / Contact</th>
+                        <th className="py-3.5 px-4">Time</th>
+                        <th className="py-3.5 px-4">Location</th>
+                        <th className="py-3.5 px-4">MoM Status</th>
+                        <th className="py-3.5 px-5 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-xs">
+                      {displayMeetings.map((meeting) => {
+                        const momDone = isMomCompleted(meeting);
+                        return (
+                          <tr
+                            key={meeting.id || meeting.meetingLogId}
+                            onClick={() => {
+                              setSelectedMeeting(meeting);
+                              fetchAttachments(meeting);
+                              setShowActionOverlay(true);
+                            }}
+                            className="hover:bg-slate-900/60 transition cursor-pointer group"
+                          >
+                            {/* Company & Contact */}
+                            <td className="py-3.5 px-5">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-bold text-slate-100 text-sm group-hover:text-blue-400 transition">
+                                  {meeting.companyName || meeting.name || 'Client Visit'}
+                                </span>
+                                {meeting.contactPersonName && (
+                                  <span className="text-[11px] text-slate-400 font-medium">
+                                    👤 {meeting.contactPersonName}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
 
-                    {isMomCompleted(meeting) ? (
-                      <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-                        MOM Submitted ✓
-                      </div>
-                    ) : (
-                      <div className="text-xs text-blue-400 font-semibold flex items-center gap-1 group">
-                        Log MOM / Check In <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" />
-                      </div>
-                    )}
-                  </div>
-                ))}
+                            {/* Time */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1.5 font-mono text-xs text-slate-300">
+                                <Clock className="h-3.5 w-3.5 text-blue-400" />
+                                {meeting.startTime ? new Date(meeting.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Flexible'}
+                              </span>
+                            </td>
 
-                {displayMeetings.length === 0 && (
-                  <div className="p-6 border border-dashed border-white/5 rounded-xl flex flex-col items-center justify-center gap-3 text-center bg-slate-950/20">
+                            {/* Location */}
+                            <td className="py-3.5 px-4">
+                              {meeting.locationName ? (
+                                <span className="inline-flex items-center gap-1 text-slate-300 truncate max-w-xs">
+                                  <MapPin className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                                  <span className="truncate">{meeting.locationName}</span>
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 font-mono text-[11px]">N/A</span>
+                              )}
+                            </td>
+
+                            {/* Status Badge */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              {momDone ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                  <CheckCircle className="h-3 w-3" />
+                                  Completed
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                                  <Clock className="h-3 w-3" />
+                                  Pending MOM
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Action */}
+                            <td className="py-3.5 px-5 text-right whitespace-nowrap">
+                              {momDone ? (
+                                <span className="text-xs text-emerald-400 font-semibold inline-flex items-center gap-1">
+                                  MOM Submitted ✓
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedMeeting(meeting);
+                                    fetchAttachments(meeting);
+                                    setShowActionOverlay(true);
+                                  }}
+                                  className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-blue-400 hover:text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
+                                >
+                                  <span>Log MOM / Check In</span>
+                                  <ChevronRight className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-6 border-t border-white/5 flex flex-col items-center justify-center gap-3 text-center bg-slate-950/20">
                     <p className="text-xs text-slate-500 font-medium">No meetings scheduled for this day</p>
                     <button
                       onClick={() => {
@@ -1251,10 +1326,13 @@ export default function CalendarTab() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
-                    setTaskForm((prev) => ({
-                      ...prev,
-                      dueDate: getLocalDateString(selectedDate)
-                    }));
+                    setTaskForm({
+                      id: null,
+                      subject: '',
+                      dueDate: getLocalDateString(selectedDate),
+                      status: 'NOT_STARTED',
+                      priority: 'NORMAL'
+                    });
                     setShowTaskModal(true);
                   }}
                   className="px-2.5 py-1 bg-emerald-600/10 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 animate-fade shadow"
@@ -1272,43 +1350,99 @@ export default function CalendarTab() {
               </div>
             </div>
 
+            {/* Table block for Tasks */}
             {!collapseTasks && (
-              <div className="p-4 space-y-3">
-                {displayTasks.map((task) => (
-                  <div
-                    key={task.id || task.taskLogId}
-                    className="p-4 bg-slate-900/50 rounded-xl border border-white/5 flex justify-between items-center gap-4"
-                  >
-                    <div className="space-y-1">
-                      <h4 className="font-bold text-slate-100 text-sm">{task.subject}</h4>
-                      <p className="text-[10px] text-slate-500 font-mono">Due: {task.dueDate}</p>
-                    </div>
+              <div className="overflow-x-auto">
+                {displayTasks.length > 0 ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-slate-900/50 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="py-3.5 px-5">Task Subject</th>
+                        <th className="py-3.5 px-4">Due Date</th>
+                        <th className="py-3.5 px-4">Priority</th>
+                        <th className="py-3.5 px-4">Status</th>
+                        <th className="py-3.5 px-5 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-xs">
+                      {displayTasks.map((task) => (
+                        <tr
+                          key={task.id || task.taskLogId}
+                          onClick={() => {
+                            setTaskForm({
+                              id: task.id || task.taskLogId,
+                              subject: task.subject || '',
+                              dueDate: task.dueDate || getLocalDateString(selectedDate),
+                              status: task.status || 'NOT_STARTED',
+                              priority: task.priority || 'NORMAL'
+                            });
+                            setShowTaskModal(true);
+                          }}
+                          className="hover:bg-slate-900/60 transition cursor-pointer group"
+                        >
+                          {/* Subject */}
+                          <td className="py-3.5 px-5 font-bold text-slate-100 text-sm group-hover:text-emerald-400 transition">
+                            {task.subject}
+                          </td>
 
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
-                        task.priority === 'HIGH' || task.priority === 'HIGHEST'
-                          ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                          : task.priority === 'NORMAL'
-                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                          : 'bg-slate-800 text-slate-400 border-white/5'
-                      }`}>
-                        {task.priority || 'N/A'}
-                      </span>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                        task.status === 'COMPLETED'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : task.status === 'IN_PROGRESS'
-                          ? 'bg-amber-500/10 text-amber-400'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}>
-                        {(task.status || 'PENDING').replace('_', ' ')}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                          {/* Due Date */}
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-300 font-mono text-xs">
+                            📅 {task.dueDate || 'No Date'}
+                          </td>
 
-                {displayTasks.length === 0 && (
-                  <div className="p-6 border border-dashed border-white/5 rounded-xl flex flex-col items-center justify-center gap-3 text-center bg-slate-950/20">
+                          {/* Priority Badge */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                              task.priority === 'HIGH' || task.priority === 'HIGHEST'
+                                ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                : task.priority === 'NORMAL'
+                                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                : 'bg-slate-800 text-slate-400 border-white/5'
+                            }`}>
+                              {task.priority || 'NORMAL'}
+                            </span>
+                          </td>
+
+                          {/* Status Badge */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                              task.status === 'COMPLETED'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : task.status === 'IN_PROGRESS'
+                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                : 'bg-slate-800 text-slate-400 border-white/5'
+                            }`}>
+                              {(task.status || 'PENDING').replace(/_/g, ' ')}
+                            </span>
+                          </td>
+
+                          {/* Action Button */}
+                          <td className="py-3.5 px-5 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTaskForm({
+                                  id: task.id || task.taskLogId,
+                                  subject: task.subject || '',
+                                  dueDate: task.dueDate || getLocalDateString(selectedDate),
+                                  status: task.status || 'NOT_STARTED',
+                                  priority: task.priority || 'NORMAL'
+                                });
+                                setShowTaskModal(true);
+                              }}
+                              className="px-3 py-1.5 bg-emerald-600/10 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
+                            >
+                              <span>Edit Task</span>
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-6 border-t border-white/5 flex flex-col items-center justify-center gap-3 text-center bg-slate-950/20">
                     <p className="text-xs text-slate-500 font-medium">No tasks logged for this day</p>
                     <button
                       onClick={() => {
@@ -1363,55 +1497,88 @@ export default function CalendarTab() {
               </div>
             </div>
 
+            {/* Table block for Calls */}
             {!collapseCalls && (
-              <div className="p-4 space-y-3">
-                {displayCalls.map((call) => (
-                  <div
-                    key={call.id || call.callId}
-                    className="p-4 bg-slate-900/50 rounded-xl border border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-100 text-sm">{call.subject}</h4>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                          call.callType === 'INCOMING'
-                            ? 'bg-blue-500/10 text-blue-400'
-                            : call.callType === 'OUTGOING'
-                            ? 'bg-purple-500/10 text-purple-400'
-                            : 'bg-red-500/10 text-red-400'
-                        }`}>
-                          {call.callType}
-                        </span>
-                      </div>
-                      {call.notes && <p className="text-xs text-slate-400 leading-relaxed italic">{call.notes}</p>}
-                    </div>
+              <div className="overflow-x-auto">
+                {displayCalls.length > 0 ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-slate-900/50 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="py-3.5 px-5">Call Subject / Notes</th>
+                        <th className="py-3.5 px-4">Customer</th>
+                        <th className="py-3.5 px-4">Category</th>
+                        <th className="py-3.5 px-4">Call Type</th>
+                        <th className="py-3.5 px-5 text-right">Result Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-xs">
+                      {displayCalls.map((call) => (
+                        <tr
+                          key={call.id || call.callId}
+                          className="hover:bg-slate-900/60 transition group"
+                        >
+                          {/* Subject & Notes */}
+                          <td className="py-3.5 px-5">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-bold text-slate-100 text-sm group-hover:text-purple-400 transition">
+                                {call.subject || 'Call Outcome Log'}
+                              </span>
+                              {call.notes && (
+                                <span className="text-[11px] text-slate-400 italic">
+                                  {call.notes}
+                                </span>
+                              )}
+                            </div>
+                          </td>
 
-                    <span className="text-[10px] font-semibold bg-slate-800 text-slate-300 px-2.5 py-1 rounded-xl">
-                      Result: {call.callResult.replace('_', ' ')}
-                    </span>
-                  </div>
-                ))}
+                          {/* Customer */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-200 font-medium">
+                              <span className="text-blue-400 font-bold">👤</span>
+                              <span>{getCallCustomerName(call)}</span>
+                            </div>
+                          </td>
 
-                {displayCalls.length === 0 && (
-                  <div className="p-6 border border-dashed border-white/5 rounded-xl flex flex-col items-center justify-center gap-3 text-center bg-slate-950/20">
+                          {/* Category */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-white/5 tracking-wider">
+                              {getCallCategory(call)}
+                            </span>
+                          </td>
+
+                          {/* Call Type */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                              call.callType === 'INCOMING'
+                                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                : call.callType === 'OUTGOING'
+                                ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                            }`}>
+                              {call.callType || 'OUTGOING'}
+                            </span>
+                          </td>
+
+                          {/* Result Outcome */}
+                          <td className="py-3.5 px-5 text-right whitespace-nowrap">
+                            <span className="text-[10px] font-semibold bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-white/5">
+                              Result: {(call.callResult || 'NONE').replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-6 border-t border-white/5 flex flex-col items-center justify-center gap-3 text-center bg-slate-950/20">
                     <p className="text-xs text-slate-500 font-medium">No calls logged for this day</p>
-                    <div className="flex gap-2">
-                      {/* Logging direct call trigger */}
-                      {/* <button
-                        onClick={() => setShowDialerDirectory(true)}
-                        className="px-4 py-2 bg-purple-600/10 hover:bg-purple-600 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
-                      >
-                        <Phone className="h-3.5 w-3.5" />
-                        Dial Call
-                      </button> */}
-                      <button
-                        onClick={() => setShowCallModal(true)}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-white/5 text-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Log Call Result
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setShowCallModal(true)}
+                      className="px-4 py-2 bg-purple-600/10 hover:bg-purple-600 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Log Call
+                    </button>
                   </div>
                 )}
               </div>
@@ -1605,7 +1772,7 @@ export default function CalendarTab() {
           >
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
-              <h3 className="text-base font-bold text-slate-100">Create Task Log</h3>
+              <h3 className="text-base font-bold text-slate-100">{taskForm.id ? 'Edit Task Log' : 'Create Task Log'}</h3>
               <button onClick={() => setShowTaskModal(false)} className="text-slate-400 hover:text-white">
                 <X className="h-5 w-5" />
               </button>
@@ -1681,7 +1848,7 @@ export default function CalendarTab() {
                 type="submit"
                 className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-all"
               >
-                SAVE TASK LOG
+                {taskForm.id ? 'UPDATE TASK LOG' : 'SAVE TASK LOG'}
               </button>
             </form>
           </div>
