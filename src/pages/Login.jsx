@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, User, Lock, ArrowRight, Activity } from 'lucide-react';
+import { LogIn, User, Lock, ArrowRight, TrendingUp } from 'lucide-react';
 import { loginUser } from '../api/apiFunctions/Login/Login_api_function';
 
 export default function Login() {
@@ -139,7 +139,7 @@ export default function Login() {
                   transitionDelay: (!isAssembled || logoClicked) ? '0ms' : `0ms`
                 }}
               >
-                <Activity size={44} strokeWidth={3.5} />
+                <TrendingUp size={44} strokeWidth={3.5} />
               </span>
 
               {"BIZDRIVE".split("").map((char, index) => {
