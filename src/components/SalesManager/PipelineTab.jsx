@@ -548,7 +548,7 @@ export default function PipelineTab() {
         companyName: selectedLead?.company || '',
         contactPersonName: selectedLead?.contactName || '',
         momDescription: momNotes,
-        meetingLogId: selectedLead?.momId || selectedLead?.id || null,
+        meetingLogId: selectedLead?.momId || null,
         pitch_details: {
           products_pitched: momForm.productsPitched,
           budget: momForm.budget || 'TBD',
@@ -636,7 +636,7 @@ export default function PipelineTab() {
         companyName: leadItem.company || rawMom.companyName || '',
         contactPersonName: leadItem.contactName || rawMom.contactPersonName || '',
         momDescription: rawMom.momDescription || '',
-        meetingLogId: leadItem.momId || leadItem.id || null,
+        meetingLogId: leadItem.momId || null,
         pitch_details: rawMom.pitch_details || {
           products_pitched: '',
           budget: 'TBD',
@@ -689,8 +689,7 @@ export default function PipelineTab() {
         priority: raw.priority || 'WARM',
         notes: raw.notes || '',
         address: raw.address || '',
-        customerType: raw.customerType || 'Customer',
-        userId: raw.userId || localStorage.getItem('userId') || ''
+        customerType: raw.customerType || 'Customer'
       };
       await saveOrUpdateLead(payload);
       alert(`Lead stage updated to ${status.replace('_', ' ').toLowerCase()} successfully.`);
