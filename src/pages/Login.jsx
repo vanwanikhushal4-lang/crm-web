@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, User, Lock, ArrowRight } from 'lucide-react';
 import { loginUser } from '../api/apiFunctions/Login/Login_api_function';
-import bizdriveLogo from '../assets/BIZDRIVE-LOGO.png';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [logoClicked, setLogoClicked] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
 
@@ -106,9 +106,53 @@ export default function Login() {
         className="relative z-10 w-full max-w-[420px] p-10 m-4 rounded-[2rem] bg-slate-900/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] transition-transform duration-200 ease-out will-change-transform"
       >
         <div className="flex flex-col items-center mb-10">
-          {/* Re-designed Logo Placement */}
-          <div className="bg-white p-5 rounded-2xl shadow-[0_0_40px_rgba(255,255,255,0.08)] mb-8 transform hover:scale-105 transition-all duration-300">
-            <img src={bizdriveLogo} alt="BizDrive CRM" className="h-14 w-auto object-contain drop-shadow-sm" />
+          {/* Interactive Scatter Text Logo */}
+          <div 
+            onClick={() => {
+              if (logoClicked) return;
+              setLogoClicked(true);
+              setTimeout(() => setLogoClicked(false), 2000); // Snap back after 2 seconds
+            }}
+            className="cursor-pointer bg-white/5 p-4 rounded-2xl shadow-[0_0_40px_rgba(255,255,255,0.04)] mb-8 border border-white/10 select-none overflow-visible"
+            title="Click me!"
+          >
+            <div className="flex font-black text-[42px] tracking-tighter" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              {"BIZDRIVE".split("").map((char, index) => {
+                // Hardcoded playful explosion paths for each letter
+                const scatterPaths = [
+                  { x: -140, y: -90, r: -65, c: '#3b82f6' }, // B (Blue)
+                  { x: -60, y: -160, r: 140, c: '#ec4899' }, // I (Pink)
+                  { x: 20, y: -110, r: -90, c: '#10b981' },  // Z (Green)
+                  { x: 110, y: -140, r: 220, c: '#f59e0b' }, // D (Orange)
+                  { x: 160, y: -70, r: -160, c: '#8b5cf6' }, // R (Purple)
+                  { x: -110, y: 90, r: 100, c: '#ef4444' },  // I (Red)
+                  { x: -30, y: 130, r: -240, c: '#06b6d4' }, // V (Cyan)
+                  { x: 90, y: 110, r: 70, c: '#eab308' },    // E (Yellow)
+                ];
+                const path = scatterPaths[index];
+                const isBiz = index < 3;
+                
+                return (
+                  <span
+                    key={index}
+                    className="inline-block transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-125 hover:-translate-y-2"
+                    style={{
+                      transform: logoClicked 
+                        ? `translate(${path.x}px, ${path.y}px) rotate(${path.r}deg) scale(1.6)` 
+                        : 'translate(0px, 0px) rotate(0deg) scale(1)',
+                      color: logoClicked ? path.c : (isBiz ? '#3b82f6' : '#ffffff'),
+                      textShadow: logoClicked 
+                        ? `0 0 25px ${path.c}` 
+                        : (isBiz ? '0 0 15px rgba(59,130,246,0.5)' : 'none'),
+                      zIndex: logoClicked ? 50 : 1,
+                      transitionDelay: logoClicked ? '0ms' : `${index * 40}ms` // Stagger the snap back!
+                    }}
+                  >
+                    {char}
+                  </span>
+                )
+              })}
+            </div>
           </div>
           
           <h1 className="text-3xl font-bold text-white tracking-tight">Welcome Back</h1>
