@@ -35,6 +35,12 @@ export default function Login() {
         localStorage.setItem('userId', res.data?.userId || userDetails.id || userDetails.userId || '');
         localStorage.setItem('roleType', roleType ? String(roleType) : '');
         localStorage.setItem('role', roleRaw ? String(roleRaw) : '');
+
+        // Save user name
+        const first = String(userDetails.firstName || userDetails.firstname || userDetails.first_name || '').trim();
+        const last = String(userDetails.lastName || userDetails.lastname || userDetails.last_name || '').trim();
+        const fullName = `${first} ${last}`.trim() || userDetails.name || userDetails.username || userDetails.email || username || '';
+        localStorage.setItem('userName', fullName);
       }
 
       // Check role exactly as mobile app

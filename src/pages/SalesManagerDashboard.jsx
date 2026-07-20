@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import bizdriveLogo from '../assets/BIZDRIVE-LOGO.png';
+import { getAllUsers } from '../api/apiFunctions/Login/Login_api_function';
 
 // Import modular subcomponents
 import CommandCenter from '../components/SalesManager/CommandCenter';
@@ -40,6 +41,31 @@ export default function SalesManagerDashboard() {
     setActiveTab(tab);
     localStorage.setItem('salesActiveTab', tab);
   };
+
+  const [userName, setUserName] = useState(() => {
+    return localStorage.getItem('userName') || 'Sales Manager';
+  });
+
+  useEffect(() => {
+    const storedName = localStorage.getItem('userName');
+    const userId = localStorage.getItem('userId');
+    if ((!storedName || storedName === 'Sales Manager') && userId) {
+      getAllUsers().then((res) => {
+        const arr = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const current = arr.find(u => String(u.id || u.userId) === String(userId));
+        if (current) {
+          const first = String(current.firstName || current.firstname || current.first_name || '').trim();
+          const last = String(current.lastName || current.lastname || current.last_name || '').trim();
+          const fullName = `${first} ${last}`.trim() || current.name || current.username || current.email || '';
+          if (fullName) {
+            localStorage.setItem('userName', fullName);
+            setUserName(fullName);
+          }
+        }
+      }).catch(err => console.error("Error loading user name:", err));
+    }
+  }, []);
+
   const [currentTime, setCurrentTime] = useState(new Date());
   
   // Shared modals state
@@ -171,7 +197,7 @@ export default function SalesManagerDashboard() {
             </div>
             {!isSidebarCollapsed && (
               <div className="overflow-hidden animate-fade">
-                <p className="text-sm font-semibold text-slate-200 truncate">User</p>
+                <p className="text-sm font-semibold text-slate-200 truncate">{userName}</p>
                 <p className="text-xs text-slate-500 truncate">Sales Manager</p>
               </div>
             )}
@@ -254,7 +280,7 @@ export default function SalesManagerDashboard() {
               <User className="h-5 w-5 text-blue-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-200 truncate">User</p>
+              <p className="text-sm font-semibold text-slate-200 truncate">{userName}</p>
               <p className="text-xs text-slate-500 truncate">Sales Manager</p>
             </div>
           </div>
