@@ -92,6 +92,7 @@ export const createCustomerMaster = async (payload) => {
     throw error;
   }
 };
+export const saveCustomer = createCustomerMaster;
 
 export const saveCustomerWithCompany = async (payload) => {
   try {

@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 
 import {
-  getAllCustomerDetails,
+  getAllCustomersByUserId,
+  saveCustomer,
   getAllMeetingLogs,
   getTaskLogs,
   getCalls,
@@ -173,6 +174,21 @@ export default function CalendarTab() {
   const [showDialerDirectory, setShowDialerDirectory] = useState(false);
   const [dialerSearch, setDialerSearch] = useState('');
 
+  // Contact Profile autocomplete search state
+  const [contactProfileSearch, setContactProfileSearch] = useState('');
+  const [showContactProfileDropdown, setShowContactProfileDropdown] = useState(false);
+
+  // New Customer entry form state inside Call outcome modal
+  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    companyName: '',
+    phone: '',
+    email: '',
+    designation: ''
+  });
+
   // MOM Form state (inside Action Overlay)
   const [momNotes, setMomNotes] = useState('');
   const [productsCatalog, setProductsCatalog] = useState([]);
@@ -206,8 +222,9 @@ export default function CalendarTab() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Get all customers (to compile autocompletes)
-      const customerRes = await getAllCustomerDetails();
+      // Get all customers by current user ID
+      const userId = localStorage.getItem('userId') || '2';
+      const customerRes = await getAllCustomersByUserId(userId);
       if (customerRes && Array.isArray(customerRes.data)) {
         setCustomers(customerRes.data);
       } else if (Array.isArray(customerRes)) {
@@ -432,6 +449,58 @@ export default function CalendarTab() {
     );
   };
 
+  // Helper to resolve customer company name
+  const getCustomerCompanyName = (c) => {
+    if (!c) return '';
+    if (typeof c.companyName === 'string' && c.companyName.trim()) {
+      return c.companyName.trim();
+    }
+    if (c.company && typeof c.company === 'object' && typeof c.company.companyName === 'string') {
+      return c.company.companyName.trim();
+    }
+    if (typeof c.company === 'string' && c.company.trim() && isNaN(c.company)) {
+      return c.company.trim();
+    }
+    if (typeof c.company_name === 'string' && c.company_name.trim()) {
+      return c.company_name.trim();
+    }
+    return '';
+  };
+
+  // Helper to resolve customer contact display name
+  const getCustomerDisplayName = (c) => {
+    if (!c) return '';
+    
+    // 1. Check first and last name
+    const first = typeof c.firstName === 'string' ? c.firstName.trim() : typeof c.first_name === 'string' ? c.first_name.trim() : '';
+    const last = typeof c.lastName === 'string' ? c.lastName.trim() : typeof c.last_name === 'string' ? c.last_name.trim() : '';
+    const full = `${first} ${last}`.trim();
+    if (full) return full;
+
+    // 2. Check explicit contact person / customer / name fields
+    const names = [
+      c.contactPersonName,
+      c.contactPerson,
+      c.contact_person_name,
+      c.contact_person,
+      c.customerName,
+      c.customer_name,
+      c.name
+    ];
+    for (const n of names) {
+      if (typeof n === 'string' && n.trim()) {
+        return n.trim();
+      }
+    }
+
+    // 3. Fallback to company name if available
+    const comp = getCustomerCompanyName(c);
+    if (comp) return comp;
+
+    // 4. Final fallback to ID
+    return `Customer #${c.id || c.customerId || 'Entry'}`;
+  };
+
   // Form autocomplete handlers
   const handleCompanyChange = (val) => {
     setCompanySearch(val);
@@ -558,6 +627,60 @@ export default function CalendarTab() {
       fetchData();
     } catch (error) {
       alert('Error logging call: ' + (error?.response?.data?.message || error.message));
+    }
+  };
+
+  const handleCreateCustomerInModal = async () => {
+    if (!newCustomerForm.name.trim()) {
+      alert('Please enter a customer contact name.');
+      return;
+    }
+    setIsSavingCustomer(true);
+    try {
+      const userId = localStorage.getItem('userId') || '2';
+      const nameTrimmed = newCustomerForm.name.trim();
+      const nameParts = nameTrimmed.split(' ');
+      const firstName = nameParts[0] || nameTrimmed;
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const payload = {
+        firstName: firstName,
+        lastName: lastName,
+        name: nameTrimmed,
+        contactPersonName: nameTrimmed,
+        contactPerson: nameTrimmed,
+        customerName: nameTrimmed,
+        companyName: newCustomerForm.companyName.trim() || nameTrimmed,
+        phone: newCustomerForm.phone.trim(),
+        phoneNo: newCustomerForm.phone.trim(),
+        mobileNo: newCustomerForm.phone.trim(),
+        email: newCustomerForm.email.trim(),
+        designation: newCustomerForm.designation.trim(),
+        userId: Number(userId)
+      };
+      const res = await saveCustomer(payload);
+      alert('Customer saved successfully!');
+      
+      // Refresh customer list from API using getAllCustomersByUserId
+      const freshListRes = await getAllCustomersByUserId(userId);
+      const freshList = Array.isArray(freshListRes?.data) ? freshListRes.data : Array.isArray(freshListRes) ? freshListRes : [];
+      setCustomers(freshList);
+
+      const createdId = res?.data?.id || res?.id || (freshList.length > 0 ? freshList[0].id : '');
+      setCallForm((prev) => ({
+        ...prev,
+        customerId: String(createdId || ''),
+        customerName: payload.name,
+        customerPhone: payload.phone,
+        subject: `Call with ${payload.name}`
+      }));
+
+      setNewCustomerForm({ name: '', companyName: '', phone: '', email: '', designation: '' });
+      setShowNewCustomerForm(false);
+    } catch (err) {
+      alert('Error saving customer: ' + (err?.response?.data?.message || err.message));
+    } finally {
+      setIsSavingCustomer(false);
     }
   };
 
@@ -1659,31 +1782,164 @@ export default function CalendarTab() {
 
             <form onSubmit={handleSaveCall} className="space-y-4">
               
-              {/* Customer Select dropdown */}
-              <div>
-                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Contact Profile</label>
-                <select
-                  value={callForm.customerId}
-                  onChange={(e) => {
-                    const selected = customers.find(c => String(c.id) === e.target.value);
-                    setCallForm({
-                      ...callForm,
-                      customerId: e.target.value,
-                      customerName: selected?.contactPerson || selected?.name || '',
-                      customerPhone: selected?.phone || '',
-                      subject: `Call with ${selected?.contactPerson || selected?.name || 'client'}`
-                    });
-                  }}
-                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
-                  required
-                >
-                  <option value="">Select Customer profile...</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.contactPerson || c.name} ({c.companyName || 'Individual'})
-                    </option>
-                  ))}
-                </select>
+              {/* Customer Select dropdown / Add Customer block */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-slate-400 font-semibold block">Contact Profile</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCustomerForm(!showNewCustomerForm)}
+                    className="text-xs text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {showNewCustomerForm ? 'Cancel New Customer' : 'Add New Customer'}
+                  </button>
+                </div>
+
+                {!showNewCustomerForm ? (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Type customer name or company to search..."
+                      value={contactProfileSearch}
+                      onFocus={() => setShowContactProfileDropdown(true)}
+                      onChange={(e) => {
+                        setContactProfileSearch(e.target.value);
+                        setShowContactProfileDropdown(true);
+                        setCallForm(prev => ({ ...prev, customerId: '', customerName: e.target.value }));
+                      }}
+                      className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder-slate-500"
+                      required
+                    />
+
+                    {showContactProfileDropdown && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto hide-scrollbar text-left">
+                        {/* Trigger to create new entry */}
+                        <div
+                          onClick={() => {
+                            setShowContactProfileDropdown(false);
+                            setNewCustomerForm(prev => ({
+                              ...prev,
+                              name: contactProfileSearch && !contactProfileSearch.startsWith('Customer #') ? contactProfileSearch : '',
+                              companyName: ''
+                            }));
+                            setShowNewCustomerForm(true);
+                          }}
+                          className="p-3 hover:bg-blue-600/20 text-blue-400 text-xs font-semibold cursor-pointer border-b border-white/5 flex items-center gap-1.5"
+                        >
+                          <Plus className="h-3.5 w-3.5 shrink-0" />
+                          <span>Add New Customer Entry: "{contactProfileSearch || 'New Customer'}"</span>
+                        </div>
+
+                        {/* Filtered customer entries */}
+                        {customers
+                          .filter((c) => {
+                            if (!contactProfileSearch.trim()) return true;
+                            const q = contactProfileSearch.toLowerCase();
+                            const name = getCustomerDisplayName(c).toLowerCase();
+                            const comp = getCustomerCompanyName(c).toLowerCase();
+                            const phone = (c.phoneNo || c.phone || c.mobileNo || '').toLowerCase();
+                            const email = (c.email || '').toLowerCase();
+                            return name.includes(q) || comp.includes(q) || phone.includes(q) || email.includes(q);
+                          })
+                          .map((c) => {
+                            const name = getCustomerDisplayName(c);
+                            const comp = getCustomerCompanyName(c);
+                            const phone = c.phoneNo || c.phone || c.mobileNo || '';
+
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => {
+                                  setCallForm({
+                                    ...callForm,
+                                    customerId: String(c.id),
+                                    customerName: name,
+                                    customerPhone: phone,
+                                    subject: `Call with ${name}`
+                                  });
+                                  setContactProfileSearch(comp ? `${name} (${comp})` : name);
+                                  setShowContactProfileDropdown(false);
+                                }}
+                                className="p-3 hover:bg-slate-800 text-slate-200 text-xs cursor-pointer border-b border-white/5 last:border-0 flex justify-between items-center gap-2"
+                              >
+                                <div>
+                                  <p className="font-bold text-slate-100 text-sm">{name}</p>
+                                  {comp && <p className="text-[11px] text-blue-400 font-medium">{comp}</p>}
+                                </div>
+                                {phone && <span className="text-[10px] text-slate-400 font-mono shrink-0">{phone}</span>}
+                              </div>
+                            );
+                          })}
+
+                        {customers.filter((c) => {
+                          if (!contactProfileSearch.trim()) return true;
+                          const q = contactProfileSearch.toLowerCase();
+                          return getCustomerDisplayName(c).toLowerCase().includes(q) || getCustomerCompanyName(c).toLowerCase().includes(q);
+                        }).length === 0 && (
+                          <div className="p-3 text-xs text-slate-500 text-center">
+                            No matching customers found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-slate-950/60 border border-blue-500/30 rounded-xl space-y-3 animate-fade text-left">
+                    <p className="text-xs font-bold text-blue-400 border-b border-white/5 pb-1">New Customer Entry</p>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Full Name / Contact Person *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Rahul Sharma"
+                        value={newCustomerForm.name}
+                        onChange={(e) => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs focus:outline-none focus:border-blue-500 text-slate-100"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Company Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Apex Tech Pvt Ltd"
+                        value={newCustomerForm.companyName}
+                        onChange={(e) => setNewCustomerForm({ ...newCustomerForm, companyName: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs focus:outline-none focus:border-blue-500 text-slate-100"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Phone Number</label>
+                        <input
+                          type="text"
+                          placeholder="+91 98765 43210"
+                          value={newCustomerForm.phone}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs focus:outline-none focus:border-blue-500 text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Email</label>
+                        <input
+                          type="email"
+                          placeholder="rahul@apex.com"
+                          value={newCustomerForm.email}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs focus:outline-none focus:border-blue-500 text-slate-100"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCreateCustomerInModal}
+                      disabled={isSavingCustomer}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow"
+                    >
+                      {isSavingCustomer ? 'Saving Customer...' : 'Save & Select Customer'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Related To Category */}
