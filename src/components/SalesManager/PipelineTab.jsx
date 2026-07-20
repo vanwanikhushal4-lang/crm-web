@@ -116,6 +116,7 @@ export default function PipelineTab() {
   const [pipelineType, setPipelineType] = useState('meeting'); // meeting, lead
   const [viewMode, setViewMode] = useState('table'); // board, list, table
   const [isLoading, setIsLoading] = useState(false);
+  const [animateGraph, setAnimateGraph] = useState(false);
 
   // Filter and search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -196,6 +197,16 @@ export default function PipelineTab() {
 
   // Expanded cards tracker for List View
   const [expandedCards, setExpandedCards] = useState({});
+
+  // Animate distribution graph after loading
+  useEffect(() => {
+    if (!isLoading) {
+      const timer = setTimeout(() => setAnimateGraph(true), 150);
+      return () => clearTimeout(timer);
+    } else {
+      setAnimateGraph(false);
+    }
+  }, [isLoading]);
 
   // Format date helper
   const getFormattedDate = () => {
@@ -971,32 +982,58 @@ export default function PipelineTab() {
       </div>
 
       {/* Segment Distribution Progress bar */}
-      <div className="bg-[#0c1220]/40 border border-white/5 rounded-2xl p-5 space-y-3 shadow">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Pipeline Distribution</span>
+      <div className="bg-[#0c1220]/40 border border-white/5 rounded-2xl p-5 space-y-4 shadow overflow-hidden relative group">
+        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block flex items-center gap-2">
+          Pipeline Distribution
+          <div className="h-px bg-slate-800 flex-1 ml-2"></div>
+        </span>
         
         {/* Stacked segmented bar */}
-        <div className="h-3 w-full bg-slate-900 rounded-full overflow-hidden flex">
+        <div className="h-4 w-full bg-slate-900/80 rounded-full overflow-hidden flex shadow-inner p-0.5 gap-0.5">
           {distribution.map((seg, idx) => {
-            const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-indigo-500', 'bg-purple-500', 'bg-rose-500'];
+            const colors = [
+              'bg-gradient-to-r from-blue-600 to-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]', 
+              'bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]', 
+              'bg-gradient-to-r from-amber-600 to-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.3)]', 
+              'bg-gradient-to-r from-indigo-600 to-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.3)]', 
+              'bg-gradient-to-r from-purple-600 to-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.3)]', 
+              'bg-gradient-to-r from-rose-600 to-rose-400 shadow-[0_0_10px_rgba(225,29,72,0.3)]'
+            ];
+            
             return (
               <div
                 key={idx}
-                style={{ width: `${seg.percent}%` }}
-                className={`${colors[idx % colors.length]} h-full`}
-                title={`${seg.stage}: ${seg.count}`}
-              ></div>
+                style={{ 
+                  width: animateGraph ? `${seg.percent}%` : '0%',
+                  transition: `width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${idx * 0.15}s` 
+                }}
+                className={`${colors[idx % colors.length]} h-full rounded-full transition-all duration-300 hover:scale-y-125 hover:brightness-125 hover:z-10 relative cursor-pointer group/segment`}
+              >
+                {/* Tooltip on hover */}
+                <div className="absolute opacity-0 group-hover/segment:opacity-100 bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded-md whitespace-nowrap pointer-events-none transition-all duration-300 transform translate-y-2 group-hover/segment:translate-y-0 z-20 shadow-xl border border-white/10">
+                  {seg.stage}: {seg.count} ({seg.percent}%)
+                </div>
+              </div>
             );
           })}
         </div>
 
         {/* Distribution Legend labels */}
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] text-slate-400">
+        <div className="flex flex-wrap gap-x-4 gap-y-3 text-[11px] text-slate-300 pt-1">
           {distribution.map((seg, idx) => {
             const borderColors = ['border-blue-500', 'border-emerald-500', 'border-amber-500', 'border-indigo-500', 'border-purple-500', 'border-rose-500'];
             return (
-              <span key={idx} className="flex items-center gap-1.5 font-semibold">
-                <span className={`h-2 w-2 rounded-full border-2 ${borderColors[idx % borderColors.length]}`}></span>
-                {seg.stage} ({seg.count})
+              <span 
+                key={idx} 
+                className="flex items-center gap-2 font-semibold hover:text-white transition-all cursor-default"
+                style={{ 
+                  opacity: animateGraph ? 1 : 0, 
+                  transform: animateGraph ? 'translateY(0)' : 'translateY(10px)',
+                  transition: `all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) ${0.5 + idx * 0.1}s` 
+                }}
+              >
+                <span className={`h-2.5 w-2.5 rounded-full border-2 ${borderColors[idx % borderColors.length]} shadow-[0_0_5px_currentColor]`}></span>
+                {seg.stage} <span className="text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded-md text-[9px] font-bold">{seg.count}</span>
               </span>
             );
           })}
