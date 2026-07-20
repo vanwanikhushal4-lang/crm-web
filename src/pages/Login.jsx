@@ -156,7 +156,7 @@ export default function Login() {
             <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
             
             <span className="relative flex items-center justify-center gap-2">
-              {isLoading ? 'Authenticating...' : 'Access Dashboard'}
+              {isLoading ? 'Authenticating...' : 'Login'}
               {!isLoading && <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform duration-300" />}
             </span>
           </button>
