@@ -639,7 +639,7 @@ export default function PipelineTab() {
         stage: status
       };
       await saveOrUpdateLead(payload);
-      alert(`Lead marked as ${status.toLowerCase()} successfully.`);
+      alert(`Lead stage updated to ${status.replace('_', ' ').toLowerCase()} successfully.`);
       fetchPipelineData();
     } catch (error) {
       alert('Failed to update lead: ' + (error?.response?.data?.message || error.message));
@@ -1212,14 +1212,12 @@ export default function PipelineTab() {
                     <td className="py-4 px-5">
                       <div className="flex gap-2 justify-end">
                         {lead.leadId ? (
-                          !['WON', 'LOST'].includes(lead.stage) && (
-                            <button
-                              onClick={() => handleCloseLead(lead)}
-                              className="px-2.5 py-1.5 bg-[#10b981] hover:bg-[#059669] text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
-                            >
-                              Close Lead
-                            </button>
-                          )
+                          <button
+                            onClick={() => handleCloseLead(lead)}
+                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                          >
+                            Update Lead
+                          </button>
                         ) : (
                           <button
                             onClick={() => openEditMomModal(lead)}
@@ -1348,14 +1346,12 @@ export default function PipelineTab() {
                       {/* Expand Actions list */}
                       <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-white/5 w-full">
                         {lead.leadId ? (
-                          !['WON', 'LOST'].includes(lead.stage) && (
-                            <button
-                              onClick={() => handleCloseLead(lead)}
-                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow"
-                            >
-                              Close Lead
-                            </button>
-                          )
+                          <button
+                            onClick={() => handleCloseLead(lead)}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
+                          >
+                            Update Lead
+                          </button>
                         ) : (
                           <button
                             onClick={() => openEditMomModal(lead)}
@@ -1774,14 +1770,14 @@ export default function PipelineTab() {
         </div>
       )}
 
-      {/* MODAL 4: CLOSE LEAD OPTIONS MODAL */}
+      {/* MODAL 4: UPDATE LEAD OPTIONS MODAL */}
       {showCloseModal && selectedLead && (
         <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-sm p-6 space-y-6 shadow-2xl relative">
+          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-sm p-6 space-y-6 shadow-2xl relative text-left">
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
-              <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
-                Close Lead: {selectedLead.company}
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5 truncate">
+                Update Lead: {selectedLead.company}
               </h3>
               <button 
                 onClick={() => {
@@ -1794,30 +1790,37 @@ export default function PipelineTab() {
               </button>
             </div>
 
-            <p className="text-xs text-slate-300">
-              Select the final outcome stage for the lead <strong>{selectedLead.company}</strong>:
-            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Pipeline Stage</label>
+                <select
+                  defaultValue={selectedLead.stage || 'NEW_LEAD'}
+                  id="update-lead-stage-select"
+                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/10 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
+                >
+                  <option value="NEW_LEAD">New Lead</option>
+                  <option value="CONTACTED">Contacted</option>
+                  <option value="QUALIFIED">Qualified</option>
+                  <option value="PROPOSAL_SENT">Proposal Sent</option>
+                  <option value="NEGOTIATION">Negotiation</option>
+                  <option value="WON">Won</option>
+                  <option value="LOST">Lost</option>
+                </select>
+              </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={async () => {
-                  await updateLeadStage(selectedLead, 'WON');
+                  const selectEl = document.getElementById('update-lead-stage-select');
+                  if (selectEl) {
+                    const newStage = selectEl.value;
+                    await updateLeadStage(selectedLead, newStage);
+                  }
                   setShowCloseModal(false);
                   setSelectedLead(null);
                 }}
-                className="py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg transition"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition"
               >
-                Mark as Won
-              </button>
-              <button
-                onClick={async () => {
-                  await updateLeadStage(selectedLead, 'LOST');
-                  setShowCloseModal(false);
-                  setSelectedLead(null);
-                }}
-                className="py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg transition"
-              >
-                Mark as Lost
+                UPDATE STAGE
               </button>
             </div>
           </div>
