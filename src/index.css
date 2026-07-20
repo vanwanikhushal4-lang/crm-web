@@ -281,6 +281,23 @@ h1, h2, h3, h4 {
   }
 }
 
+@media (max-width: 768px) {
+  .responsive-sidebar-aside,
+  .desktop-sidebar-nav {
+    display: none !important;
+  }
+  .mobile-menu-drawer-toggle {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-menu-drawer-toggle,
+  .mobile-sidebar-drawer {
+    display: none !important;
+  }
+}
+
 @media (max-width: 640px) {
   .responsive-table-wrapper {
     width: 100%;
