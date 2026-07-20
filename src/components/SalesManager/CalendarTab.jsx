@@ -1211,10 +1211,8 @@ export default function CalendarTab() {
         {(filterType === 'All' || filterType === 'Calls') && (
           <div className="bg-[#0b1628]/40 border border-white/5 rounded-2xl overflow-hidden shadow">
             
-            <button
-              onClick={() => setCollapseCalls(!collapseCalls)}
-              className="w-full flex justify-between items-center px-5 py-4 bg-slate-900/30 border-b border-white/5 hover:bg-slate-900/40 transition text-left"
-            >
+            {/* Header section */}
+            <div className="w-full flex justify-between items-center px-5 py-4 bg-slate-900/30 border-b border-white/5">
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-purple-400" />
                 <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
@@ -1224,8 +1222,23 @@ export default function CalendarTab() {
                   {displayCalls.length}
                 </span>
               </div>
-              {collapseCalls ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-400" />}
-            </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowCallModal(true)}
+                  className="px-2.5 py-1 bg-purple-600/10 hover:bg-purple-600 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 animate-fade shadow"
+                  title="Log Call"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Log Call</span>
+                </button>
+                <button
+                  onClick={() => setCollapseCalls(!collapseCalls)}
+                  className="p-1 text-slate-400 hover:text-white transition"
+                >
+                  {collapseCalls ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4 animate-fade" />}
+                </button>
+              </div>
+            </div>
 
             {!collapseCalls && (
               <div className="p-4 space-y-3">
@@ -1261,13 +1274,13 @@ export default function CalendarTab() {
                     <p className="text-xs text-slate-500 font-medium">No calls logged for this day</p>
                     <div className="flex gap-2">
                       {/* Logging direct call trigger */}
-                      <button
+                      {/* <button
                         onClick={() => setShowDialerDirectory(true)}
                         className="px-4 py-2 bg-purple-600/10 hover:bg-purple-600 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
                       >
                         <Phone className="h-3.5 w-3.5" />
                         Dial Call
-                      </button>
+                      </button> */}
                       <button
                         onClick={() => setShowCallModal(true)}
                         className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-white/5 text-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1"
