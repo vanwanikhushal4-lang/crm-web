@@ -670,10 +670,27 @@ export default function PipelineTab() {
   const updateLeadStage = async (leadItem, status) => {
     try {
       setIsLoading(true);
+      const raw = leadItem.leadData || {};
       const payload = {
-        ...leadItem.leadData,
         id: leadItem.leadId,
-        stage: status
+        company: raw.company || '',
+        product: Array.isArray(raw.product) ? raw.product.join(', ') : raw.product || '',
+        industry: raw.industry || '',
+        city: raw.city || '',
+        contactName: raw.contactName || '',
+        designation: raw.designation || '',
+        email: raw.email || '',
+        phone: raw.phone || '',
+        stage: status,
+        dealValue: raw.dealValue || '',
+        partner: raw.partner || '',
+        leadSource: raw.leadSource || 'DIRECT',
+        expectedCloseDate: raw.expectedCloseDate || '',
+        priority: raw.priority || 'WARM',
+        notes: raw.notes || '',
+        address: raw.address || '',
+        customerType: raw.customerType || 'Customer',
+        userId: raw.userId || localStorage.getItem('userId') || ''
       };
       await saveOrUpdateLead(payload);
       alert(`Lead stage updated to ${status.replace('_', ' ').toLowerCase()} successfully.`);
