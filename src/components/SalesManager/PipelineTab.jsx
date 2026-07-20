@@ -134,6 +134,8 @@ export default function PipelineTab() {
   const [showMomModal, setShowMomModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
+  const [tempSelectedStage, setTempSelectedStage] = useState(null);
+  const [followUpDate, setFollowUpDate] = useState('');
 
   const [momForm, setMomForm] = useState({
     productsPitched: [],
@@ -622,12 +624,47 @@ export default function PipelineTab() {
   };
 
   const handleCloseLead = (leadItem) => {
-    if (!leadItem?.leadId) {
-      alert('Cannot close: No Lead ID found.');
-      return;
-    }
     setSelectedLead(leadItem);
     setShowCloseModal(true);
+  };
+
+  const updateMomStage = async (leadItem, nextStep, followUpDate = '') => {
+    try {
+      setIsLoading(true);
+      const rawMom = leadItem.momData || {};
+      const payload = {
+        companyName: leadItem.company || rawMom.companyName || '',
+        contactPersonName: leadItem.contactName || rawMom.contactPersonName || '',
+        momDescription: rawMom.momDescription || '',
+        meetingLogId: leadItem.momId || leadItem.id || null,
+        pitch_details: rawMom.pitch_details || {
+          products_pitched: '',
+          budget: 'TBD',
+          timeline: '0-3 Months',
+          lead_type: 'Warm',
+          is_interested: false
+        },
+        competition_and_history: rawMom.competition_and_history || {
+          competitor_name: '',
+          blockers: '',
+          pitched_to_whom: '',
+          pitched_by_whom: '',
+          already_pitched: false
+        },
+        outcome: {
+          ...(rawMom.outcome || {}),
+          next_step: nextStep,
+          follow_up_date: followUpDate
+        }
+      };
+      await saveMoMDetailsOfCustomer(payload);
+      alert(`Lead stage updated to ${nextStep} successfully.`);
+      fetchPipelineData();
+    } catch (error) {
+      alert('Failed to update lead: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateLeadStage = async (leadItem, status) => {
@@ -1211,22 +1248,12 @@ export default function PipelineTab() {
                     </td>
                     <td className="py-4 px-5">
                       <div className="flex gap-2 justify-end">
-                        {lead.leadId ? (
-                          <button
-                            onClick={() => handleCloseLead(lead)}
-                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
-                          >
-                            Update Lead
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => openEditMomModal(lead)}
-                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
-                          >
-                            <FileText className="h-3 w-3" />
-                            Edit MOM Detail
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleCloseLead(lead)}
+                          className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                        >
+                          Update Lead
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1345,22 +1372,12 @@ export default function PipelineTab() {
 
                       {/* Expand Actions list */}
                       <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-white/5 w-full">
-                        {lead.leadId ? (
-                          <button
-                            onClick={() => handleCloseLead(lead)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
-                          >
-                            Update Lead
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => openEditMomModal(lead)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            Edit MOM Detail
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleCloseLead(lead)}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
+                        >
+                          Update Lead
+                        </button>
                       </div>
 
                     </div>
@@ -1783,6 +1800,8 @@ export default function PipelineTab() {
                 onClick={() => {
                   setShowCloseModal(false);
                   setSelectedLead(null);
+                  setTempSelectedStage(null);
+                  setFollowUpDate('');
                 }} 
                 className="text-slate-400 hover:text-white"
               >
@@ -1790,45 +1809,136 @@ export default function PipelineTab() {
               </button>
             </div>
 
-            <p className="text-[11px] text-slate-400">
-              Select a stage to update this lead opportunity instantly:
-            </p>
+            {selectedLead.leadId ? (
+              // Option list for Leads
+              <>
+                <p className="text-[11px] text-slate-400">
+                  Select a stage to update this lead opportunity instantly:
+                </p>
 
-            <div className="flex flex-col gap-2 pt-1 max-h-[60vh] overflow-y-auto pr-1 hide-scrollbar">
-              {[
-                { label: 'New Lead', value: 'NEW_LEAD', color: 'hover:bg-slate-800 hover:text-slate-200 border-white/5 text-slate-400' },
-                { label: 'Contacted', value: 'CONTACTED', color: 'hover:bg-blue-600/10 hover:border-blue-500/20 hover:text-blue-300 border-white/5 text-slate-400' },
-                { label: 'Qualified', value: 'QUALIFIED', color: 'hover:bg-indigo-600/10 hover:border-indigo-500/20 hover:text-indigo-300 border-white/5 text-slate-400' },
-                { label: 'Proposal Sent', value: 'PROPOSAL_SENT', color: 'hover:bg-amber-600/10 hover:border-amber-500/20 hover:text-amber-300 border-white/5 text-slate-400' },
-                { label: 'Negotiation', value: 'NEGOTIATION', color: 'hover:bg-purple-600/10 hover:border-purple-500/20 hover:text-purple-300 border-white/5 text-slate-400' },
-                { label: 'Won', value: 'WON', color: 'hover:bg-emerald-600/10 hover:border-emerald-500/20 hover:text-emerald-300 border-white/5 text-slate-400' },
-                { label: 'Lost', value: 'LOST', color: 'hover:bg-rose-600/10 hover:border-rose-500/20 hover:text-rose-300 border-white/5 text-slate-400' },
-              ].map((stage) => {
-                const isCurrent = (selectedLead.stage || 'NEW_LEAD') === stage.value;
-                return (
-                  <button
-                    key={stage.value}
-                    onClick={async () => {
-                      await updateLeadStage(selectedLead, stage.value);
-                      setShowCloseModal(false);
-                      setSelectedLead(null);
-                    }}
-                    className={`w-full py-2.5 px-4 rounded-xl border text-xs font-bold text-left transition-all duration-200 flex items-center justify-between hover:scale-[1.01] active:scale-[0.99] ${
-                      isCurrent
-                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/15'
-                        : `bg-slate-900/40 border-white/5 ${stage.color}`
-                    }`}
-                  >
-                    <span>{stage.label}</span>
-                    {isCurrent && (
-                      <span className="text-[9px] bg-white/20 px-2 py-0.5 rounded uppercase tracking-wider font-semibold text-white">
-                        Current
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                <div className="flex flex-col gap-2 pt-1 max-h-[60vh] overflow-y-auto pr-1 hide-scrollbar">
+                  {[
+                    { label: 'New Lead', value: 'NEW_LEAD', color: 'hover:bg-slate-800 hover:text-slate-200 border-white/5 text-slate-400' },
+                    { label: 'Contacted', value: 'CONTACTED', color: 'hover:bg-blue-600/10 hover:border-blue-500/20 hover:text-blue-300 border-white/5 text-slate-400' },
+                    { label: 'Qualified', value: 'QUALIFIED', color: 'hover:bg-indigo-600/10 hover:border-indigo-500/20 hover:text-indigo-300 border-white/5 text-slate-400' },
+                    { label: 'Proposal Sent', value: 'PROPOSAL_SENT', color: 'hover:bg-amber-600/10 hover:border-amber-500/20 hover:text-amber-300 border-white/5 text-slate-400' },
+                    { label: 'Negotiation', value: 'NEGOTIATION', color: 'hover:bg-purple-600/10 hover:border-purple-500/20 hover:text-purple-300 border-white/5 text-slate-400' },
+                    { label: 'Won', value: 'WON', color: 'hover:bg-emerald-600/10 hover:border-emerald-500/20 hover:text-emerald-300 border-white/5 text-slate-400' },
+                    { label: 'Lost', value: 'LOST', color: 'hover:bg-rose-600/10 hover:border-rose-500/20 hover:text-rose-300 border-white/5 text-slate-400' },
+                  ].map((stage) => {
+                    const isCurrent = (selectedLead.stage || 'NEW_LEAD') === stage.value;
+                    return (
+                      <button
+                        key={stage.value}
+                        onClick={async () => {
+                          await updateLeadStage(selectedLead, stage.value);
+                          setShowCloseModal(false);
+                          setSelectedLead(null);
+                        }}
+                        className={`w-full py-2.5 px-4 rounded-xl border text-xs font-bold text-left transition-all duration-200 flex items-center justify-between hover:scale-[1.01] active:scale-[0.99] ${
+                          isCurrent
+                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/15'
+                            : `bg-slate-900/40 border-white/5 ${stage.color}`
+                        }`}
+                      >
+                        <span>{stage.label}</span>
+                        {isCurrent && (
+                          <span className="text-[9px] bg-white/20 px-2 py-0.5 rounded uppercase tracking-wider font-semibold text-white">
+                            Current
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              // Option list for MOM-based leads
+              <>
+                <p className="text-[11px] text-slate-400">
+                  Select a meeting next-step outcome to update this customer:
+                </p>
+
+                <div className="flex flex-col gap-2 pt-1 max-h-[45vh] overflow-y-auto pr-1 hide-scrollbar">
+                  {[
+                    { label: 'Technical Discussion', value: 'Technical Discussion', color: 'hover:bg-blue-600/10 hover:border-blue-500/20 hover:text-blue-300 border-white/5 text-slate-400' },
+                    { label: 'Demo', value: 'Demo', color: 'hover:bg-indigo-600/10 hover:border-indigo-500/20 hover:text-indigo-300 border-white/5 text-slate-400' },
+                    { label: 'POC Request', value: 'POC Request', color: 'hover:bg-purple-600/10 hover:border-purple-500/20 hover:text-purple-300 border-white/5 text-slate-400' },
+                    { label: 'Proposal', value: 'Proposal', color: 'hover:bg-amber-600/10 hover:border-amber-500/20 hover:text-amber-300 border-white/5 text-slate-400' },
+                    { label: 'Negotiations', value: 'Negotiations', color: 'hover:bg-orange-600/10 hover:border-orange-500/20 hover:text-orange-300 border-white/5 text-slate-400' },
+                    { label: 'Closure', value: 'Closure', color: 'hover:bg-teal-600/10 hover:border-teal-500/20 hover:text-teal-300 border-white/5 text-slate-400' },
+                    { label: 'Won', value: 'Won', color: 'hover:bg-emerald-600/10 hover:border-emerald-500/20 hover:text-emerald-300 border-white/5 text-slate-400' },
+                    { label: 'Lost', value: 'Lost', color: 'hover:bg-rose-600/10 hover:border-rose-500/20 hover:text-rose-300 border-white/5 text-slate-400' },
+                  ].map((stage) => {
+                    const currentOutcome = selectedLead.momData?.outcome?.next_step || selectedLead.momData?.next_step || 'Technical Discussion';
+                    const isCurrent = currentOutcome === stage.value;
+                    const isTempSelected = tempSelectedStage === stage.value;
+                    
+                    return (
+                      <button
+                        key={stage.value}
+                        onClick={async () => {
+                          if (stage.value === 'Won' || stage.value === 'Lost') {
+                            await updateMomStage(selectedLead, stage.value);
+                            setShowCloseModal(false);
+                            setSelectedLead(null);
+                            setTempSelectedStage(null);
+                          } else {
+                            setTempSelectedStage(stage.value);
+                          }
+                        }}
+                        className={`w-full py-2.5 px-4 rounded-xl border text-xs font-bold text-left transition-all duration-200 flex items-center justify-between hover:scale-[1.01] active:scale-[0.99] ${
+                          isTempSelected
+                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/15'
+                            : isCurrent && !tempSelectedStage
+                            ? 'bg-slate-800 border-slate-700 text-slate-200'
+                            : `bg-slate-900/40 border-white/5 ${stage.color}`
+                        }`}
+                      >
+                        <span>{stage.label}</span>
+                        {isCurrent && !tempSelectedStage && (
+                          <span className="text-[9px] bg-white/10 px-2 py-0.5 rounded uppercase tracking-wider font-semibold text-slate-300">
+                            Current
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Follow Up Date Picker (Shown if any option other than Won/Lost is selected) */}
+                {tempSelectedStage && tempSelectedStage !== 'Won' && tempSelectedStage !== 'Lost' && (
+                  <div className="bg-[#0c1220] border border-white/10 p-4 rounded-xl space-y-3 mt-3 animate-fade text-left">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Follow Up Date</label>
+                      <input
+                        type="date"
+                        value={followUpDate}
+                        onChange={(e) => setFollowUpDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-white/5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!followUpDate) {
+                          alert('Please select a follow up date.');
+                          return;
+                        }
+                        await updateMomStage(selectedLead, tempSelectedStage, followUpDate);
+                        setShowCloseModal(false);
+                        setSelectedLead(null);
+                        setTempSelectedStage(null);
+                        setFollowUpDate('');
+                      }}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
+                    >
+                      Save Follow Up & Update
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
