@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, User, Lock, ArrowRight } from 'lucide-react';
+import { LogIn, User, Lock, ArrowRight, Activity } from 'lucide-react';
 import { loginUser } from '../api/apiFunctions/Login/Login_api_function';
 
 export default function Login() {
@@ -8,12 +8,19 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [logoClicked, setLogoClicked] = useState(false);
+  const [isAssembled, setIsAssembled] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
 
   // Refs for cursor animations
   const cursorRef = useRef(null);
   const panelRef = useRef(null);
+
+  useEffect(() => {
+    // Trigger initial assemble animation shortly after mount
+    const timer = setTimeout(() => setIsAssembled(true), 150);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -109,14 +116,32 @@ export default function Login() {
           {/* Interactive Scatter Text Logo */}
           <div 
             onClick={() => {
-              if (logoClicked) return;
+              if (logoClicked || !isAssembled) return;
               setLogoClicked(true);
               setTimeout(() => setLogoClicked(false), 2000); // Snap back after 2 seconds
             }}
-            className="cursor-pointer bg-white/5 p-4 rounded-2xl shadow-[0_0_40px_rgba(255,255,255,0.04)] mb-8 border border-white/10 select-none overflow-visible"
+            className="cursor-pointer bg-white/5 p-4 rounded-2xl shadow-[0_0_40px_rgba(255,255,255,0.04)] mb-8 border border-white/10 select-none overflow-visible flex items-center justify-center gap-1"
             title="Click me!"
           >
-            <div className="flex font-black text-[42px] tracking-tighter" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            <div className="flex items-center font-black text-[42px] tracking-tighter" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              
+              {/* The Graph Logo (Activity) */}
+              <span
+                className="inline-block transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-125 hover:-translate-y-2 mr-2"
+                style={{
+                  transform: (!isAssembled || logoClicked)
+                    ? `translate(-180px, -20px) rotate(-180deg) scale(1.6)` 
+                    : 'translate(0px, 0px) rotate(0deg) scale(1)',
+                  color: (!isAssembled || logoClicked) ? '#ef4444' : '#3b82f6',
+                  opacity: (!isAssembled || logoClicked) ? 0.9 : 1,
+                  filter: (!isAssembled || logoClicked) ? `drop-shadow(0 0 15px #ef4444)` : 'drop-shadow(0 0 10px rgba(59,130,246,0.5))',
+                  zIndex: (!isAssembled || logoClicked) ? 50 : 1,
+                  transitionDelay: (!isAssembled || logoClicked) ? '0ms' : `0ms`
+                }}
+              >
+                <Activity size={44} strokeWidth={3.5} />
+              </span>
+
               {"BIZDRIVE".split("").map((char, index) => {
                 // Hardcoded playful explosion paths for each letter
                 const scatterPaths = [
@@ -131,21 +156,22 @@ export default function Login() {
                 ];
                 const path = scatterPaths[index];
                 const isBiz = index < 3;
+                const isScattered = !isAssembled || logoClicked;
                 
                 return (
                   <span
                     key={index}
                     className="inline-block transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-125 hover:-translate-y-2"
                     style={{
-                      transform: logoClicked 
+                      transform: isScattered
                         ? `translate(${path.x}px, ${path.y}px) rotate(${path.r}deg) scale(1.6)` 
                         : 'translate(0px, 0px) rotate(0deg) scale(1)',
-                      color: logoClicked ? path.c : (isBiz ? '#3b82f6' : '#ffffff'),
-                      textShadow: logoClicked 
+                      color: isScattered ? path.c : (isBiz ? '#3b82f6' : '#ffffff'),
+                      textShadow: isScattered 
                         ? `0 0 25px ${path.c}` 
                         : (isBiz ? '0 0 15px rgba(59,130,246,0.5)' : 'none'),
-                      zIndex: logoClicked ? 50 : 1,
-                      transitionDelay: logoClicked ? '0ms' : `${index * 40}ms` // Stagger the snap back!
+                      zIndex: isScattered ? 50 : 1,
+                      transitionDelay: isScattered ? '0ms' : `${(index + 1) * 40}ms` // Stagger the snap back!
                     }}
                   >
                     {char}
