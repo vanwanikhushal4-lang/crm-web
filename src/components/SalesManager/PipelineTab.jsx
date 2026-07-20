@@ -1264,12 +1264,21 @@ export default function PipelineTab() {
                     </td>
                     <td className="py-4 px-5">
                       <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={() => handleCloseLead(lead)}
-                          className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
-                        >
-                          Update Lead
-                        </button>
+                        {lead.leadId ? (
+                          <button
+                            onClick={() => handleCloseLead(lead)}
+                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                          >
+                            Update Lead
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => openEditMomModal(lead)}
+                            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                          >
+                            Edit MOM Detail
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1388,12 +1397,21 @@ export default function PipelineTab() {
 
                       {/* Expand Actions list */}
                       <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-white/5 w-full">
-                        <button
-                          onClick={() => handleCloseLead(lead)}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
-                        >
-                          Update Lead
-                        </button>
+                        {lead.leadId ? (
+                          <button
+                            onClick={() => handleCloseLead(lead)}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
+                          >
+                            Update Lead
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => openEditMomModal(lead)}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow"
+                          >
+                            Edit MOM Detail
+                          </button>
+                        )}
                       </div>
 
                     </div>
