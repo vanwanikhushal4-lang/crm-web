@@ -6,7 +6,6 @@ import {
   TrendingUp,
   Users,
   Search,
-  UserPlus,
   LogOut,
   Menu,
   Activity,
@@ -322,14 +321,7 @@ export default function SalesManagerDashboard() {
               />
             </div>
             
-            {/* Add User Plus Trigger */}
-            <button
-              onClick={() => setShowAddLeadModal(true)}
-              className="p-2 rounded-lg bg-slate-900/60 border border-white/5 text-slate-300 hover:text-white hover:border-blue-500/30 transition-all shadow-md flex items-center justify-center"
-              title="Add New Lead"
-            >
-              <UserPlus className="h-4 w-4" />
-            </button>
+
             
             {/* Live Clock */}
             <div className="text-xs text-slate-400 bg-slate-900/40 border border-white/5 px-3 py-1.5 rounded-lg font-mono">
