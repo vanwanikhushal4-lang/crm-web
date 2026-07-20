@@ -99,15 +99,71 @@ export default function CommandCenter({
       setAllMoms(momsArr);
       setRawLeads(leadsArr);
 
-      // Reconcile and build Today's Itinerary
-      const reconciledItinerary = meetingsArr.map((m) => {
+      // Reconcile and build Today's Itinerary (filter for today only, resolve customer lookup)
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      const todaysMeetings = meetingsArr.filter((m) => {
+        const mDate = m.scheduledDate || m.date || m.startTime || '';
+        return mDate && mDate.slice(0, 10) === todayKey;
+      });
+
+      const reconciledItinerary = todaysMeetings.map((m) => {
         const checkinRecord = m.checkedInTime || m.checkedInLatitude ? 'ACTIVE' : 'PLANNED';
         const momRecord = momsArr.find(mom => mom.meetingLogId === m.id || mom.meetingLogId === m.meetingLogId);
         
+        // Fetch customer info from master customers list (checking all ID variants)
+        const customerId = 
+          m.customerId || 
+          m.customer_id || 
+          m.customerID || 
+          m.customer?.id || 
+          m.customer?.customerId || 
+          m.accountId || 
+          m.account_id || 
+          m.account?.id || 
+          m.customerMasterId || 
+          m.customer_master_id || 
+          '';
+
+        const customerRef = allCustArr.find(c => {
+          const cId = 
+            c.id || 
+            c.customerId || 
+            c.customer_id || 
+            c.customerID || 
+            c.customerMasterId || 
+            c.customer_master_id || 
+            c.accountId || 
+            c.account_id || 
+            '';
+          return cId && String(cId) === String(customerId);
+        });
+
+        const companyNameFromMaster = customerRef?.companyName || customerRef?.company || customerRef?.accountName || '';
+        const personNameFromMaster = customerRef?.contactPerson || customerRef?.contactPersonName || customerRef?.name || `${customerRef?.firstName || ''} ${customerRef?.lastName || ''}`.trim() || '';
+
+        const finalCompanyName = 
+          companyNameFromMaster || 
+          m.companyName || 
+          m.company || 
+          m.customerName || 
+          m.name || 
+          m.accountName ||
+          m.clientName ||
+          'Unknown Client';
+
+        const finalContactPerson = 
+          personNameFromMaster || 
+          m.contactPersonName || 
+          m.contactPerson || 
+          m.contactName || 
+          'Unassigned';
+
         return {
           id: m.id || m.meetingLogId,
-          customerName: m.companyName || m.company || 'Unknown Client',
-          contactPerson: m.contactPersonName || m.contactPerson || 'Unassigned',
+          customerName: finalCompanyName,
+          contactPerson: finalContactPerson,
           time: m.startTime ? new Date(m.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Flexible',
           status: momRecord ? 'MOM FILLED' : checkinRecord,
           momNotes: momRecord ? momRecord.momDescription : '',

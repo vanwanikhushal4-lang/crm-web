@@ -21,6 +21,7 @@ import {
   Table
 } from 'lucide-react';
 
+
 import {
   getLeads,
   getAllCustomersByUserId,
@@ -131,7 +132,23 @@ export default function PipelineTab() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showMomModal, setShowMomModal] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
+
+  const [momForm, setMomForm] = useState({
+    productsPitched: [],
+    budget: '',
+    timeline: '0-3 Months',
+    leadType: 'Warm',
+    isInterested: true,
+    competitorsMentioned: '',
+    alreadyPitchedToOrg: false,
+    pitchedToWhom: '',
+    pitchedByWhom: '',
+    currentBlockers: '',
+    nextStep: 'Technical Discussion',
+    followUpDate: ''
+  });
 
   // Form states
   const [leadForm, setLeadForm] = useState({
@@ -237,67 +254,191 @@ export default function PipelineTab() {
     fetchPipelineData();
   }, []);
 
-  // Merge lists to build dynamic unified rows
+  // Helper: get a stable customer ID from a customer record
+  const getCustomerRecordId = (customer) => {
+    const id = customer?.id ?? customer?.customerId ?? customer?.customer_id ?? customer?.customerID ?? '';
+    return id ? String(id) : '';
+  };
+
+  // Helper: get the customer ID referenced by a MOM entry
+  const getMomCustomerId = (mom) => {
+    const id =
+      mom?.account_id ?? mom?.accountId ?? mom?.customer_id ?? mom?.customerId ??
+      mom?.customerID ?? mom?.account?.id ?? mom?.customer?.id ?? '';
+    return id ? String(id) : '';
+  };
+
+  // Helper: get the customer ID referenced by a lead entry
+  const getLeadCustomerId = (lead) => {
+    const id =
+      lead?.customerId ?? lead?.customer_id ?? lead?.customerID ??
+      lead?.accountId ?? lead?.account_id ?? lead?.accountID ??
+      lead?.customerMasterId ?? lead?.customer_master_id ??
+      lead?.customer?.id ?? lead?.customer?.customerId ??
+      lead?.account?.id ?? '';
+    return id ? String(id) : '';
+  };
+
+  // Merge lists to build dynamic unified rows — matches mobile app's buildLeadRows pattern
   const buildUnifiedPipeline = (leads, allCust, assignedCust, moms) => {
-    const rows = leads.map((lead, idx) => {
-      // Find matching customer details
-      const matchedCust = allCust.find(
-        (c) =>
-          (c.companyName && lead.company && c.companyName.toLowerCase() === lead.company.toLowerCase()) ||
-          (c.name && lead.contactName && c.name.toLowerCase() === lead.contactName.toLowerCase())
-      ) || {};
+    // 1. Build customer ID set and lookup maps
+    const userCustomerIds = new Set(assignedCust.map(getCustomerRecordId).filter(Boolean));
+    const customerMap = {};
+    const companyToId = {};
 
-      // Get meetings details
-      const matchedMom = moms.find(
-        (m) =>
-          (m.companyName && lead.company && m.companyName.toLowerCase() === lead.company.toLowerCase()) ||
-          m.meetingLogId === lead.id
-      ) || {};
+    // Index assigned customers first (they take priority)
+    assignedCust.forEach((c) => {
+      const id = getCustomerRecordId(c);
+      if (!id) return;
+      customerMap[id] = c;
+      const compName = (c.companyName || c.customerName || c.name || c.accountName || '').trim().toLowerCase();
+      if (compName && !companyToId[compName]) companyToId[compName] = id;
+    });
 
-      const dealValNum = parseBudgetToCr(lead.dealValue || lead.value || lead.budget);
-      
-      // Follow-up status calculations
-      const followUpStr = matchedCust.followUpDate || matchedCust.nextMeetingDate || lead.expectedCloseDate || '';
+    // Enrich with allCust data for customers we already know about
+    allCust.forEach((c) => {
+      const id = getCustomerRecordId(c);
+      if (id && customerMap[id]) {
+        customerMap[id] = { ...c, ...customerMap[id] };
+      }
+      const compName = (c.companyName || c.customerName || c.name || c.accountName || '').trim().toLowerCase();
+      if (compName && !companyToId[compName] && id && userCustomerIds.has(id)) {
+        companyToId[compName] = id;
+      }
+    });
+
+    // 2. Group MOMs by customer — keep only the latest per customer
+    const sortedMoms = [...moms].sort((a, b) => {
+      const left = Number(a?.id || new Date(a?.createdAt || a?.updatedAt || 0).getTime() || 0);
+      const right = Number(b?.id || new Date(b?.createdAt || b?.updatedAt || 0).getTime() || 0);
+      return left - right; // ascending so later entries overwrite earlier ones
+    });
+
+    const latestMomByCustomer = {};
+    sortedMoms.forEach((mom) => {
+      const customerId = getMomCustomerId(mom);
+      if (customerId && userCustomerIds.has(customerId)) {
+        latestMomByCustomer[customerId] = mom;
+      }
+    });
+
+    // 3. Resolve a lead's customer ID via direct ID or fuzzy company name match
+    const resolveLeadCustomerId = (lead) => {
+      const directId = getLeadCustomerId(lead);
+      if (directId && userCustomerIds.has(directId)) return directId;
+      const compName = (lead?.company || lead?.companyName || lead?.customerName || lead?.accountName || '').trim().toLowerCase();
+      const mappedId = companyToId[compName];
+      if (mappedId && userCustomerIds.has(mappedId)) return mappedId;
+      return '';
+    };
+
+    // 4. Shared row builder
+    const createRow = (id, lead, customer, mom, idx) => {
+      const pitch = mom?.pitch_details || {};
+      const outcome = mom?.outcome || {};
+
+      const companyName = 
+        lead?.company || 
+        lead?.companyName || 
+        customer?.companyName || 
+        customer?.customerName || 
+        customer?.company || 
+        customer?.name || 
+        customer?.accountName || 
+        mom?.companyName || 
+        mom?.customerName || 
+        mom?.accountName || 
+        mom?.company || 
+        'Unknown Company';
+
+      const contactName = 
+        lead?.contactName || 
+        lead?.contact || 
+        customer?.contactPerson || 
+        customer?.contactPersonName || 
+        customer?.name || 
+        mom?.contactPersonName || 
+        mom?.contactName || 
+        'Unassigned';
+      const stage = lead ? getStageFromLead(lead, mom) : mom ? getStageFromMom(mom) : 'NEW_LEAD';
+
+      // Deal value: lead first, then MOM budget fallback (matching mobile app)
+      const rawBudget = lead?.dealValue || lead?.value || lead?.budget || pitch?.budget || mom?.budget || '';
+      const dealValNum = parseBudgetToCr(rawBudget);
+
+      const followUpStr = lead?.expectedCloseDate || outcome?.follow_up_date || mom?.follow_up_date || customer?.followUpDate || customer?.nextMeetingDate || '';
       let isOverdue = false;
       let isHighRisk = false;
 
-      if (followUpStr) {
+      if (followUpStr && !['WON', 'LOST'].includes(stage)) {
         const followUpDateObj = new Date(followUpStr);
         const today = new Date();
-        today.setHours(0,0,0,0);
-        if (followUpDateObj < today && !['WON', 'LOST'].includes(lead.stage)) {
+        today.setHours(0, 0, 0, 0);
+        if (followUpDateObj < today) {
           isOverdue = true;
-          // If overdue by more than 7 days or priority is HIGH/HOT, flag high-risk
           const diffDays = Math.ceil((today - followUpDateObj) / (1000 * 60 * 60 * 24));
-          if (diffDays > 7 || lead.priority === 'HIGH' || lead.priority === 'HOT') {
+          if (diffDays > 7 || lead?.priority === 'HIGH' || lead?.priority === 'HOT') {
             isHighRisk = true;
           }
         }
       }
 
+      // Products: merge from lead and MOM
+      const leadProduct = lead?.product || '';
+      const momProducts = (pitch?.products_pitched || mom?.products_pitched || mom?.productsPitched || '');
+      const product = leadProduct || (Array.isArray(momProducts) ? momProducts.join(', ') : String(momProducts || ''));
+
+      const source = lead?.leadSource || (mom ? (mom?.engagement_type || mom?.engagementType || 'Meeting') : 'DIRECT');
+
       return {
-        id: lead.id || `lead-${idx}`,
-        company: lead.company || matchedCust.companyName || 'Unknown Company',
-        contactName: lead.contactName || matchedCust.contactPerson || matchedCust.name || 'Unassigned',
-        email: lead.email || matchedCust.email || '',
-        phone: lead.phone || matchedCust.phone || '',
-        stage: getStageFromLead(lead, matchedMom),
-        dealValue: lead.dealValue || '0',
+        id: id,
+        leadId: lead?.id || lead?.leadId || lead?.lead_id || '',
+        leadData: lead,
+        momId: mom?.id || '',
+        momData: mom,
+        company: companyName,
+        contactName: contactName,
+        email: lead?.email || customer?.email || customer?.emailId || '',
+        phone: lead?.phone || lead?.phoneNo || customer?.phoneNo || customer?.phone || customer?.mobileNo || '',
+        stage,
+        dealValue: rawBudget || '0',
         dealValueNumeric: dealValNum,
-        expectedCloseDate: lead.expectedCloseDate || '',
-        leadSource: lead.leadSource || 'DIRECT',
-        priority: lead.priority || 'MEDIUM',
-        notes: lead.notes || matchedMom.momDescription || '',
-        address: lead.address || matchedCust.locationName || '',
-        city: lead.city || matchedCust.city || 'Mumbai',
-        product: lead.product || '',
-        designation: lead.designation || matchedCust.designation || '',
-        partner: lead.partner || '',
-        blockers: matchedCust.blockers || '',
+        expectedCloseDate: lead?.expectedCloseDate || outcome?.follow_up_date || '',
+        leadSource: source,
+        priority: lead?.priority || (isOverdue ? 'HIGH' : String(pitch?.lead_type || '').toUpperCase() || 'MEDIUM'),
+        notes: lead?.notes || outcome?.notes || mom?.notes || mom?.momDescription || (lead ? 'No notes captured yet.' : 'No MOM captured yet.'),
+        address: lead?.address || customer?.locationName || '',
+        city: lead?.city || customer?.city || '',
+        product,
+        designation: lead?.designation || customer?.designation || '',
+        partner: lead?.partner || pitch?.pitched_by_whom || mom?.partner || mom?.reseller || '',
+        blockers: mom?.current_blockers || customer?.blockers || '',
         isOverdue,
         isHighRisk,
         followUpDate: followUpStr
       };
+    };
+
+    // 5. Pass 1: Create rows from leads (enriched with matching MOM data)
+    const rows = [];
+    const customersWithLeadRows = new Set();
+
+    leads.forEach((lead, idx) => {
+      const customerId = resolveLeadCustomerId(lead) || `unknown-${idx}`;
+      const customer = customerMap[customerId] || { companyName: lead?.company || lead?.companyName, customerType: 'Lead' };
+      const matchedMom = latestMomByCustomer[customerId] || null;
+
+      customersWithLeadRows.add(customerId);
+      rows.push(createRow(lead.id || `lead-${idx}`, lead, customer, matchedMom, idx));
+    });
+
+    // 6. Pass 2: Create rows for MOM-only customers (no lead entry)
+    Object.entries(customerMap).forEach(([customerId, customer]) => {
+      if (customersWithLeadRows.has(customerId)) return;
+      const mom = latestMomByCustomer[customerId];
+      if (mom) {
+        rows.push(createRow(`mom-${customerId}-${mom.id || 'latest'}`, null, customer, mom, 0));
+      }
     });
 
     setUnifiedLeads(rows);
@@ -396,15 +537,35 @@ export default function PipelineTab() {
     }
   };
 
-  // Submit MOM form inside Details Modal
+
   const handleSaveMomDetails = async (e) => {
     e.preventDefault();
     try {
+      setIsLoading(true);
       const payload = {
         companyName: selectedLead?.company || '',
         contactPersonName: selectedLead?.contactName || '',
         momDescription: momNotes,
-        meetingLogId: selectedLead?.id || null
+        meetingLogId: selectedLead?.momId || selectedLead?.id || null,
+        pitch_details: {
+          products_pitched: momForm.productsPitched,
+          budget: momForm.budget || 'TBD',
+          timeline: momForm.timeline || '0-3 Months',
+          lead_type: momForm.leadType || 'Warm',
+          is_interested: momForm.isInterested
+        },
+        competition_and_history: {
+          competitors_mentioned: momForm.competitorsMentioned || 'None',
+          already_pitched_to_org: momForm.alreadyPitchedToOrg,
+          pitched_to_whom: momForm.pitchedToWhom || '',
+          pitched_by_whom: momForm.pitchedByWhom || '',
+          current_blockers: momForm.currentBlockers || ''
+        },
+        outcome: {
+          next_step: momForm.nextStep || 'Technical Discussion',
+          follow_up_date: momForm.followUpDate || '',
+          notes: momNotes
+        }
       };
       await saveMoMDetailsOfCustomer(payload);
       alert('MOM details added successfully!');
@@ -413,6 +574,77 @@ export default function PipelineTab() {
       fetchPipelineData();
     } catch (err) {
       alert('MOM update failed: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMOMProductCheck = (label) => {
+    const isChecked = momForm.productsPitched.includes(label);
+    if (isChecked) {
+      setMomForm((prev) => ({
+        ...prev,
+        productsPitched: prev.productsPitched.filter((p) => p !== label)
+      }));
+    } else {
+      setMomForm((prev) => ({
+        ...prev,
+        productsPitched: [...prev.productsPitched, label]
+      }));
+    }
+  };
+
+  const openEditMomModal = (leadItem) => {
+    setSelectedLead(leadItem);
+    const mom = leadItem?.momData || {};
+    const pitch = mom?.pitch_details || {};
+    const comp = mom?.competition_and_history || {};
+    const outcome = mom?.outcome || {};
+
+    setMomNotes(mom?.momDescription || outcome?.notes || leadItem?.notes || '');
+    setMomForm({
+      productsPitched: Array.isArray(pitch?.products_pitched) 
+        ? pitch.products_pitched 
+        : (pitch?.products_pitched ? String(pitch.products_pitched).split(', ') : []),
+      budget: pitch?.budget || leadItem?.budget || mom?.budget || '',
+      timeline: pitch?.timeline || '0-3 Months',
+      leadType: pitch?.lead_type || 'Warm',
+      isInterested: pitch?.is_interested !== undefined ? pitch.is_interested : true,
+      competitorsMentioned: comp?.competitors_mentioned || '',
+      alreadyPitchedToOrg: comp?.already_pitched_to_org || false,
+      pitchedToWhom: comp?.pitched_to_whom || leadItem?.contactName || '',
+      pitchedByWhom: comp?.pitched_by_whom || '',
+      currentBlockers: comp?.current_blockers || leadItem?.blockers || '',
+      nextStep: outcome?.next_step || 'Technical Discussion',
+      followUpDate: outcome?.follow_up_date || leadItem?.expectedCloseDate || ''
+    });
+    setShowMomModal(true);
+  };
+
+  const handleCloseLead = (leadItem) => {
+    if (!leadItem?.leadId) {
+      alert('Cannot close: No Lead ID found.');
+      return;
+    }
+    setSelectedLead(leadItem);
+    setShowCloseModal(true);
+  };
+
+  const updateLeadStage = async (leadItem, status) => {
+    try {
+      setIsLoading(true);
+      const payload = {
+        ...leadItem.leadData,
+        id: leadItem.leadId,
+        stage: status
+      };
+      await saveOrUpdateLead(payload);
+      alert(`Lead marked as ${status.toLowerCase()} successfully.`);
+      fetchPipelineData();
+    } catch (error) {
+      alert('Failed to update lead: ' + (error?.response?.data?.message || error.message));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -979,26 +1211,24 @@ export default function PipelineTab() {
                     </td>
                     <td className="py-4 px-5">
                       <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={() => {
-                            setSelectedLead(lead);
-                            setShowDetailsModal(true);
-                          }}
-                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] font-bold transition border border-white/5"
-                        >
-                          Details
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedLead(lead);
-                            setMomNotes(lead.notes || '');
-                            setShowMomModal(true);
-                          }}
-                          className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
-                        >
-                          <FileText className="h-3 w-3" />
-                          MOM
-                        </button>
+                        {lead.leadId ? (
+                          !['WON', 'LOST'].includes(lead.stage) && (
+                            <button
+                              onClick={() => handleCloseLead(lead)}
+                              className="px-2.5 py-1.5 bg-[#10b981] hover:bg-[#059669] text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                            >
+                              Close Lead
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            onClick={() => openEditMomModal(lead)}
+                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                          >
+                            <FileText className="h-3 w-3" />
+                            Edit MOM Detail
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1116,27 +1346,25 @@ export default function PipelineTab() {
                       </div>
 
                       {/* Expand Actions list */}
-                      <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-white/5">
-                        <button
-                          onClick={() => {
-                            setSelectedLead(lead);
-                            setShowDetailsModal(true);
-                          }}
-                          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold transition border border-white/5"
-                        >
-                          Details
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedLead(lead);
-                            setMomNotes(lead.notes || '');
-                            setShowMomModal(true);
-                          }}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow"
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                          {lead.notes ? 'Update MOM' : 'Add MOM'}
-                        </button>
+                      <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-white/5 w-full">
+                        {lead.leadId ? (
+                          !['WON', 'LOST'].includes(lead.stage) && (
+                            <button
+                              onClick={() => handleCloseLead(lead)}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow"
+                            >
+                              Close Lead
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            onClick={() => openEditMomModal(lead)}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            Edit MOM Detail
+                          </button>
+                        )}
                       </div>
 
                     </div>
@@ -1534,10 +1762,7 @@ export default function PipelineTab() {
 
               {/* Details Action trigger MOM */}
               <button
-                onClick={() => {
-                  setMomNotes(selectedLead.notes || '');
-                  setShowMomModal(true);
-                }}
+                onClick={() => openEditMomModal(selectedLead)}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center justify-center gap-1.5"
               >
                 <FileText className="h-4 w-4" />
@@ -1549,10 +1774,58 @@ export default function PipelineTab() {
         </div>
       )}
 
-      {/* MODAL 3: MOM FORM MODAL OVERLAY */}
+      {/* MODAL 4: CLOSE LEAD OPTIONS MODAL */}
+      {showCloseModal && selectedLead && (
+        <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade">
+          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-sm p-6 space-y-6 shadow-2xl relative">
+            
+            <div className="flex justify-between items-center border-b border-white/5 pb-4">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+                Close Lead: {selectedLead.company}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowCloseModal(false);
+                  setSelectedLead(null);
+                }} 
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Select the final outcome stage for the lead <strong>{selectedLead.company}</strong>:
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={async () => {
+                  await updateLeadStage(selectedLead, 'WON');
+                  setShowCloseModal(false);
+                  setSelectedLead(null);
+                }}
+                className="py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg transition"
+              >
+                Mark as Won
+              </button>
+              <button
+                onClick={async () => {
+                  await updateLeadStage(selectedLead, 'LOST');
+                  setShowCloseModal(false);
+                  setSelectedLead(null);
+                }}
+                className="py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg transition"
+              >
+                Mark as Lost
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showMomModal && selectedLead && (
         <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl animate-fade">
+          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade max-h-[90vh] overflow-y-auto hide-scrollbar">
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
@@ -1564,29 +1837,225 @@ export default function PipelineTab() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveMomDetails} className="space-y-4">
+            <form onSubmit={handleSaveMomDetails} className="space-y-4 text-left">
               <div className="bg-slate-900/40 p-4 rounded-xl border border-white/5 text-xs text-slate-400 space-y-1">
                 <p><span className="font-bold text-slate-200">Company:</span> {selectedLead.company}</p>
                 <p><span className="font-bold text-slate-200">Contact:</span> {selectedLead.contactName}</p>
               </div>
 
-              <div>
-                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Minutes of Meeting Summary Notes</label>
-                <textarea
-                  rows="4"
-                  placeholder="Record summary details of deal discussions..."
-                  value={momNotes}
-                  onChange={(e) => setMomNotes(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-white/5 text-sm focus:outline-none focus:border-blue-500 resize-none text-slate-100"
-                  required
-                ></textarea>
+              {/* Section: Pitch Details */}
+              <div className="space-y-2.5">
+                <div className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 border-b border-white/5 pb-1">
+                  Pitch Details
+                </div>
+                
+                {/* Pitched Products Checklist */}
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Pitched Products</label>
+                  <div className="grid grid-cols-2 gap-1.5 bg-slate-950/60 p-2.5 rounded-lg border border-white/5 max-h-24 overflow-y-auto hide-scrollbar">
+                    {productsCatalog.map((prod, idx) => {
+                      const label = prod.name || prod.label || prod;
+                      const isChecked = momForm.productsPitched.includes(label);
+                      return (
+                        <label key={idx} className="flex items-center gap-1.5 text-[10px] text-slate-300 hover:text-white cursor-pointer select-none transition">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleMOMProductCheck(label)}
+                            className="rounded bg-slate-900 border-white/10 text-indigo-600 focus:ring-0 h-3.5 w-3.5"
+                          />
+                          {label}
+                        </label>
+                      );
+                    })}
+                    {productsCatalog.length === 0 && (
+                      <p className="text-[9px] text-slate-500 italic col-span-2">No products available</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Budget & Timeline */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Budget</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 1-5 Cr"
+                      value={momForm.budget}
+                      onChange={(e) => setMomForm({ ...momForm, budget: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Timeline</label>
+                    <select
+                      value={momForm.timeline}
+                      onChange={(e) => setMomForm({ ...momForm, timeline: e.target.value })}
+                      className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition"
+                    >
+                      <option value="0-3 Months">0-3 Months</option>
+                      <option value="3-6 Months">3-6 Months</option>
+                      <option value="6 Months">6 Months</option>
+                      <option value="6-12 Months">6-12 Months</option>
+                      <option value="12 Months+">12 Months+</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Lead Type & Interested flag */}
+                <div className="grid grid-cols-2 gap-2 items-center">
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Lead Type</label>
+                    <select
+                      value={momForm.leadType}
+                      onChange={(e) => setMomForm({ ...momForm, leadType: e.target.value })}
+                      className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition"
+                    >
+                      <option value="Cold">Cold</option>
+                      <option value="Warm">Warm</option>
+                      <option value="Hot">Hot</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-4">
+                    <input
+                      type="checkbox"
+                      id="momIsInterested"
+                      checked={momForm.isInterested}
+                      onChange={(e) => setMomForm({ ...momForm, isInterested: e.target.checked })}
+                      className="rounded bg-slate-950 border-white/10 text-indigo-600 focus:ring-0 h-3.5 w-3.5 cursor-pointer"
+                    />
+                    <label htmlFor="momIsInterested" className="text-[11px] text-slate-300 cursor-pointer select-none font-semibold">
+                      Client Interested?
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Competition & History */}
+              <div className="space-y-2.5 pt-1">
+                <div className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 border-b border-white/5 pb-1">
+                  Competition & History
+                </div>
+
+                {/* Competitors & Blockers */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Competitors</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Tata Tech, LexCorp"
+                      value={momForm.competitorsMentioned}
+                      onChange={(e) => setMomForm({ ...momForm, competitorsMentioned: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Blockers</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Legal team approval"
+                      value={momForm.currentBlockers}
+                      onChange={(e) => setMomForm({ ...momForm, currentBlockers: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Pitched To & Pitched By */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Pitched To Whom</label>
+                    <input
+                      type="text"
+                      placeholder="Contact person"
+                      value={momForm.pitchedToWhom}
+                      onChange={(e) => setMomForm({ ...momForm, pitchedToWhom: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Pitched By Whom</label>
+                    <input
+                      type="text"
+                      placeholder="Sales rep name"
+                      value={momForm.pitchedByWhom}
+                      onChange={(e) => setMomForm({ ...momForm, pitchedByWhom: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Already pitched */}
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    id="momAlreadyPitched"
+                    checked={momForm.alreadyPitchedToOrg}
+                    onChange={(e) => setMomForm({ ...momForm, alreadyPitchedToOrg: e.target.checked })}
+                    className="rounded bg-slate-950 border-white/10 text-indigo-600 focus:ring-0 h-3.5 w-3.5 cursor-pointer"
+                  />
+                  <label htmlFor="momAlreadyPitched" className="text-[11px] text-slate-300 cursor-pointer select-none font-semibold">
+                    Already Pitched to Organization?
+                  </label>
+                </div>
+              </div>
+
+              {/* Section: Outcome & Notes */}
+              <div className="space-y-2.5 pt-1">
+                <div className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 border-b border-white/5 pb-1">
+                  Outcome & Notes
+                </div>
+
+                {/* Next step & Follow Up */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Next Step</label>
+                    <select
+                      value={momForm.nextStep}
+                      onChange={(e) => setMomForm({ ...momForm, nextStep: e.target.value })}
+                      className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition"
+                    >
+                      <option value="Technical Discussion">Technical Discussion</option>
+                      <option value="Demo">Demo</option>
+                      <option value="POC Request">POC Request</option>
+                      <option value="Proposal">Proposal</option>
+                      <option value="Negotiations">Negotiations</option>
+                      <option value="Closure">Closure</option>
+                      <option value="Won">Won</option>
+                      <option value="Lost">Lost</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Follow Up Date</label>
+                    <input
+                      type="date"
+                      value={momForm.followUpDate}
+                      onChange={(e) => setMomForm({ ...momForm, followUpDate: e.target.value })}
+                      className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-150 cursor-pointer"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Notes text area */}
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold mb-1 block">MOM Discussion Summary</label>
+                  <textarea
+                    rows="3"
+                    placeholder="Type meeting discussion summary, decisions, next steps..."
+                    value={momNotes}
+                    onChange={(e) => setMomNotes(e.target.value)}
+                    className="w-full px-3 py-2 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-100 focus:outline-none focus:border-indigo-500 resize-none transition"
+                    required
+                  ></textarea>
+                </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-all"
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-lg transition-all"
               >
-                SUBMIT MOM FORM
+                SUBMIT MOM DETAILS
               </button>
             </form>
           </div>

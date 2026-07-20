@@ -27,7 +27,14 @@ import DssrTab from '../components/SalesManager/DssrTab';
 
 export default function SalesManagerDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('salesActiveTab') || 'home';
+  });
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    localStorage.setItem('salesActiveTab', tab);
+  };
   const [currentTime, setCurrentTime] = useState(new Date());
   
   // Shared modals state
@@ -121,7 +128,7 @@ export default function SalesManagerDashboard() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => handleTabChange(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
@@ -206,7 +213,7 @@ export default function SalesManagerDashboard() {
               deals={deals}
               itinerary={itinerary}
               setItinerary={setItinerary}
-              setActiveTab={setActiveTab}
+              setActiveTab={handleTabChange}
               setShowAddLeadModal={setShowAddLeadModal}
             />
           )}

@@ -7,7 +7,14 @@ import ChiefAdminLeadsDashboard from './Admin/ChiefAdminLeadsDashboard';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('attendance');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('adminActiveTab') || 'attendance';
+  });
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    localStorage.setItem('adminActiveTab', tab);
+  };
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -33,31 +40,31 @@ export default function AdminDashboard() {
         
         <div className="flex-col gap-2" style={{ flex: 1 }}>
           <button className={`btn ${activeTab === 'overview' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            setActiveTab('overview');
+            handleTabChange('overview');
             setIsSidebarOpen(false);
           }}>
             <BarChart3 size={18} /> Overview
           </button>
           <button className={`btn ${activeTab === 'tracking' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            setActiveTab('tracking');
+            handleTabChange('tracking');
             setIsSidebarOpen(false);
           }}>
             <Map size={18} /> Live Map Tracking
           </button>
           <button className={`btn ${activeTab === 'attendance' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            setActiveTab('attendance');
+            handleTabChange('attendance');
             setIsSidebarOpen(false);
           }}>
             <Clock size={18} /> Daily Attendance
           </button>
           <button className={`btn ${activeTab === 'sales-calendar' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            setActiveTab('sales-calendar');
+            handleTabChange('sales-calendar');
             setIsSidebarOpen(false);
           }}>
             <CalendarDays size={18} />  Calendars
           </button>
           <button className={`btn ${activeTab === 'approvals' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            setActiveTab('approvals');
+            handleTabChange('approvals');
             setIsSidebarOpen(false);
           }}>
             <Users size={18} /> User Approvals
