@@ -12,7 +12,10 @@ import {
   Activity,
   User,
   Share2,
-  FileText
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  X
 } from 'lucide-react';
 
 // Import modular subcomponents
@@ -40,6 +43,8 @@ export default function SalesManagerDashboard() {
   // Shared modals state
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Clock tick
   useEffect(() => {
@@ -107,17 +112,30 @@ export default function SalesManagerDashboard() {
     <div className="flex h-screen bg-[#070b13] text-slate-100 font-sans overflow-hidden">
       
       {/* SIDEBAR FOR DESKTOP */}
-      <aside className="hidden md:flex flex-col w-64 bg-[#0c1220] border-r border-white/5 p-6 justify-between shrink-0">
+      <aside className={`desktop-sidebar-nav hidden lg:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-[#0c1220] border-r border-white/5 p-6 justify-between shrink-0 transition-all duration-300 ease-in-out`}>
         <div className="space-y-8">
           {/* Logo / Branding */}
-          <div className="flex items-center gap-3 px-2">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Activity className="h-5 w-5 text-white" />
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+                <Activity className="h-5 w-5 text-white" />
+              </div>
+              {!isSidebarCollapsed && (
+                <div className="animate-fade">
+                  <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Command Center</h1>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Sales Portal</span>
+                </div>
+              )}
             </div>
-            <div>
-              <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Command Center</h1>
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Sales Portal</span>
-            </div>
+            
+            {/* Desktop Collapse Trigger */}
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </button>
           </div>
 
           {/* Navigation Links */}
@@ -129,6 +147,91 @@ export default function SalesManagerDashboard() {
                 <button
                   key={item.id}
                   onClick={() => handleTabChange(item.id)}
+                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium transition-all duration-300 ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
+                      : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                  }`}
+                  title={isSidebarCollapsed ? item.label : undefined}
+                >
+                  <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                  {!isSidebarCollapsed && <span className="animate-fade truncate">{item.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* User Card & Logout */}
+        <div className="border-t border-white/5 pt-6 space-y-4">
+          <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2'}`}>
+            <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center shrink-0">
+              <User className="h-5 w-5 text-blue-400" />
+            </div>
+            {!isSidebarCollapsed && (
+              <div className="overflow-hidden animate-fade">
+                <p className="text-sm font-semibold text-slate-200 truncate">User</p>
+                <p className="text-xs text-slate-500 truncate">Sales Manager</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => navigate('/login')}
+            className={`w-full flex items-center justify-center ${isSidebarCollapsed ? 'px-0' : 'gap-2 px-4'} py-2.5 rounded-xl border border-white/5 hover:border-red-500/20 text-xs font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-all duration-300`}
+            title={isSidebarCollapsed ? "Sign Out" : undefined}
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!isSidebarCollapsed && <span className="animate-fade">Sign Out</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* MOBILE BACKDROP */}
+      {isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)} 
+          className="mobile-sidebar-drawer fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden animate-fade"
+        />
+      )}
+
+      {/* MOBILE SIDEBAR DRAWER */}
+      <aside 
+        className={`mobile-sidebar-drawer fixed inset-y-0 left-0 z-50 w-64 bg-[#0c1220] border-r border-white/5 p-6 flex flex-col justify-between lg:hidden transform transition-transform duration-300 ease-in-out ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="space-y-8">
+          {/* Logo / Branding / Close */}
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+                <Activity className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Command Center</h1>
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Sales Portal</span>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Navigation Links */}
+          <nav className="space-y-1">
+            {navigationItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    handleTabChange(item.id);
+                    setIsMobileMenuOpen(false);
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
@@ -149,7 +252,7 @@ export default function SalesManagerDashboard() {
             <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center">
               <User className="h-5 w-5 text-blue-400" />
             </div>
-            <div className="overflow-hidden">
+            <div>
               <p className="text-sm font-semibold text-slate-200 truncate">User</p>
               <p className="text-xs text-slate-500 truncate">Sales Manager</p>
             </div>
@@ -170,7 +273,10 @@ export default function SalesManagerDashboard() {
         {/* HEADER */}
         <header className="flex items-center justify-between px-6 py-4 bg-[#070b13]/80 backdrop-blur-md border-b border-white/5 shrink-0 z-10">
           <div className="flex items-center gap-3">
-            <Menu className="h-5 w-5 text-slate-400 md:hidden cursor-pointer hover:text-white" />
+            <Menu 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="mobile-menu-drawer-toggle h-5 w-5 text-slate-400 lg:hidden cursor-pointer hover:text-white transition" 
+            />
             <h2 className="text-lg font-bold text-slate-100 capitalize">
               {activeTab === 'home' ? 'Command Center' : activeTab}
             </h2>
