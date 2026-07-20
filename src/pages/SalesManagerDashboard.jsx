@@ -18,6 +18,8 @@ import {
   X
 } from 'lucide-react';
 
+import bizdriveLogo from '../assets/BIZDRIVE-LOGO.png';
+
 // Import modular subcomponents
 import CommandCenter from '../components/SalesManager/CommandCenter';
 import CalendarTab from '../components/SalesManager/CalendarTab';
@@ -31,7 +33,7 @@ import DssrTab from '../components/SalesManager/DssrTab';
 export default function SalesManagerDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('salesActiveTab') || 'home';
+    return localStorage.getItem('salesActiveTab') || 'pipeline';
   });
 
   const handleTabChange = (tab) => {
@@ -100,12 +102,11 @@ export default function SalesManagerDashboard() {
   };
 
   const navigationItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
     { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
+    { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
+    { id: 'home', label: 'Home', icon: Home },
     { id: 'contacts', label: 'Contacts', icon: Users },
     { id: 'shareContact', label: 'Share Contact', icon: Share2 },
-    // { id: 'dssr', label: 'DSSR', icon: FileText },
   ];
   
   return (
@@ -117,12 +118,12 @@ export default function SalesManagerDashboard() {
           {/* Logo / Branding */}
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-                <Activity className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 shrink-0 flex items-center justify-center bg-white rounded-xl p-1">
+                <img src={bizdriveLogo} alt="Biz Drive CRM Logo" className="h-full w-full object-contain" />
               </div>
               {!isSidebarCollapsed && (
                 <div className="animate-fade">
-                  <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Command Center</h1>
+                  <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Biz Drive CRM</h1>
                   <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Sales Portal</span>
                 </div>
               )}
@@ -204,11 +205,11 @@ export default function SalesManagerDashboard() {
           {/* Logo / Branding / Close */}
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-                <Activity className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 shrink-0 flex items-center justify-center bg-white rounded-xl p-1">
+                <img src={bizdriveLogo} alt="Biz Drive CRM Logo" className="h-full w-full object-contain" />
               </div>
               <div>
-                <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Command Center</h1>
+                <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Biz Drive CRM</h1>
                 <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Sales Portal</span>
               </div>
             </div>
