@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, User, Lock, ArrowRight, TrendingUp } from 'lucide-react';
+import { LogIn, User, Lock, ArrowRight, TrendingUp, AlertCircle, X } from 'lucide-react';
 import { loginUser } from '../api/apiFunctions/Login/Login_api_function';
 
 export default function Login() {
@@ -11,6 +11,14 @@ export default function Login() {
   const [isAssembled, setIsAssembled] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
+
+  // Auto-dismiss toast notification after 5 seconds
+  useEffect(() => {
+    if (errorMsg) {
+      const timer = setTimeout(() => setErrorMsg(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMsg]);
 
   // Refs for cursor animations
   const cursorRef = useRef(null);
@@ -52,11 +60,22 @@ export default function Login() {
     
     try {
       const res = await loginUser(username, password);
+      console.log('Login Response:', res);
       
-      const token = res.data?.jwtToken || res.data?.token || res.token || res.data?.jwt;
-      const userDetails = res.data?.user || res.user || res.data;
-      const roleType = res.data?.roleType || userDetails?.roleType;
-      const roleRaw = res.data?.role || userDetails?.role;
+      const token = res?.data?.jwtToken || res?.data?.token || res?.token || res?.data?.jwt;
+      const userDetails = res?.data?.user || res?.user || res?.data;
+      const roleType = res?.data?.roleType || userDetails?.roleType;
+      const roleRaw = res?.data?.role || userDetails?.role;
+      const statusCode = res?.statusCode || res?.status;
+      const responseMessage = res?.message || res?.data?.message || res?.error;
+
+      // Handle cases where API returns 200 OK but token is missing or error is present
+      if (!token || (statusCode && statusCode >= 400)) {
+        const errorText = responseMessage || 'Invalid credentials. Please check your username and password.';
+        console.error('Login Validation Failed:', res);
+        setErrorMsg(errorText);
+        return;
+      }
       
       if (token) {
         localStorage.setItem('jwtToken', token);
@@ -86,7 +105,13 @@ export default function Login() {
       }
       
     } catch (err) {
-      setErrorMsg(err?.response?.data?.message || 'Login failed. Please check credentials.');
+      console.error('Login Exception Error:', err);
+      const serverMsg = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.data || err?.message;
+      if (serverMsg && typeof serverMsg === 'string' && !serverMsg.includes('Request failed') && !serverMsg.includes('401')) {
+        setErrorMsg(serverMsg);
+      } else {
+        setErrorMsg('Invalid credentials. Please check your username and password.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -94,6 +119,23 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#03060c]">
+      {/* FLOATING TOAST NOTIFICATION */}
+      {errorMsg && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-[#1a0a0f]/90 backdrop-blur-xl border border-red-500/30 text-red-200 text-sm font-medium shadow-[0_10px_30px_rgba(239,68,68,0.25)] animate-fade max-w-md">
+          <div className="p-1.5 rounded-xl bg-red-500/20 text-red-400 shrink-0">
+            <AlertCircle size={18} />
+          </div>
+          <p className="flex-1 pr-1">{errorMsg}</p>
+          <button 
+            onClick={() => setErrorMsg('')}
+            aria-label="Close error message"
+            className="p-1 rounded-lg hover:bg-red-500/20 text-red-400/70 hover:text-red-200 transition"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Background Gradients & Effects */}
       <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#03060c] to-[#010204] opacity-90" />
       
@@ -184,13 +226,6 @@ export default function Login() {
           <h1 className="text-3xl font-bold text-white tracking-tight">Welcome Back</h1>
           <p className="text-slate-400 text-sm mt-3 font-medium">Sign in to your CRM workspace</p>
         </div>
-
-        {errorMsg && (
-          <div className="flex items-center gap-2 p-3.5 mb-6 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-            <p>{errorMsg}</p>
-          </div>
-        )}
 
         <form onSubmit={handleLogin} className="flex flex-col gap-5">
           <div className="group relative">

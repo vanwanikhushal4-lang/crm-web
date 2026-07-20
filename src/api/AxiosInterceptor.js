@@ -26,7 +26,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isLoginRequest = error.config?.url?.includes('/login');
+    const isLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login';
+
+    if (error.response?.status === 401 && !isLoginRequest && !isLoginPage) {
       console.warn("Unauthorized, redirecting to login...");
       localStorage.clear();
       window.location.href = '/login';
