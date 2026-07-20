@@ -1773,10 +1773,10 @@ export default function PipelineTab() {
       {/* MODAL 4: UPDATE LEAD OPTIONS MODAL */}
       {showCloseModal && selectedLead && (
         <div className="fixed inset-0 z-50 bg-[#070b13]/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade">
-          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-sm p-6 space-y-6 shadow-2xl relative text-left">
+          <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-2xl relative text-left">
             
-            <div className="flex justify-between items-center border-b border-white/5 pb-4">
-              <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5 truncate">
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-1.5 truncate">
                 Update Lead: {selectedLead.company}
               </h3>
               <button 
@@ -1786,42 +1786,48 @@ export default function PipelineTab() {
                 }} 
                 className="text-slate-400 hover:text-white"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4.5 w-4.5" />
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Pipeline Stage</label>
-                <select
-                  defaultValue={selectedLead.stage || 'NEW_LEAD'}
-                  id="update-lead-stage-select"
-                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/10 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
-                >
-                  <option value="NEW_LEAD">New Lead</option>
-                  <option value="CONTACTED">Contacted</option>
-                  <option value="QUALIFIED">Qualified</option>
-                  <option value="PROPOSAL_SENT">Proposal Sent</option>
-                  <option value="NEGOTIATION">Negotiation</option>
-                  <option value="WON">Won</option>
-                  <option value="LOST">Lost</option>
-                </select>
-              </div>
+            <p className="text-[11px] text-slate-400">
+              Select a stage to update this lead opportunity instantly:
+            </p>
 
-              <button
-                onClick={async () => {
-                  const selectEl = document.getElementById('update-lead-stage-select');
-                  if (selectEl) {
-                    const newStage = selectEl.value;
-                    await updateLeadStage(selectedLead, newStage);
-                  }
-                  setShowCloseModal(false);
-                  setSelectedLead(null);
-                }}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition"
-              >
-                UPDATE STAGE
-              </button>
+            <div className="flex flex-col gap-2 pt-1 max-h-[60vh] overflow-y-auto pr-1 hide-scrollbar">
+              {[
+                { label: 'New Lead', value: 'NEW_LEAD', color: 'hover:bg-slate-800 hover:text-slate-200 border-white/5 text-slate-400' },
+                { label: 'Contacted', value: 'CONTACTED', color: 'hover:bg-blue-600/10 hover:border-blue-500/20 hover:text-blue-300 border-white/5 text-slate-400' },
+                { label: 'Qualified', value: 'QUALIFIED', color: 'hover:bg-indigo-600/10 hover:border-indigo-500/20 hover:text-indigo-300 border-white/5 text-slate-400' },
+                { label: 'Proposal Sent', value: 'PROPOSAL_SENT', color: 'hover:bg-amber-600/10 hover:border-amber-500/20 hover:text-amber-300 border-white/5 text-slate-400' },
+                { label: 'Negotiation', value: 'NEGOTIATION', color: 'hover:bg-purple-600/10 hover:border-purple-500/20 hover:text-purple-300 border-white/5 text-slate-400' },
+                { label: 'Won', value: 'WON', color: 'hover:bg-emerald-600/10 hover:border-emerald-500/20 hover:text-emerald-300 border-white/5 text-slate-400' },
+                { label: 'Lost', value: 'LOST', color: 'hover:bg-rose-600/10 hover:border-rose-500/20 hover:text-rose-300 border-white/5 text-slate-400' },
+              ].map((stage) => {
+                const isCurrent = (selectedLead.stage || 'NEW_LEAD') === stage.value;
+                return (
+                  <button
+                    key={stage.value}
+                    onClick={async () => {
+                      await updateLeadStage(selectedLead, stage.value);
+                      setShowCloseModal(false);
+                      setSelectedLead(null);
+                    }}
+                    className={`w-full py-2.5 px-4 rounded-xl border text-xs font-bold text-left transition-all duration-200 flex items-center justify-between hover:scale-[1.01] active:scale-[0.99] ${
+                      isCurrent
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/15'
+                        : `bg-slate-900/40 border-white/5 ${stage.color}`
+                    }`}
+                  >
+                    <span>{stage.label}</span>
+                    {isCurrent && (
+                      <span className="text-[9px] bg-white/20 px-2 py-0.5 rounded uppercase tracking-wider font-semibold text-white">
+                        Current
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
