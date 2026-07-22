@@ -33,6 +33,7 @@ import {
   createNewDesignation,
   saveMoMDetailsOfCustomer
 } from '../../api/apiFunctions/Login/Login_api_function';
+import RunningNumber from '../common/RunningNumber';
 
 export const parseBudgetToCr = (value) => {
   if (value == null || value === '') return 0;
@@ -952,7 +953,7 @@ export default function PipelineTab() {
         <div className="bg-[#0c1220]/60 border border-white/5 rounded-2xl p-5 hover:border-blue-500/20 transition duration-300">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Active Pipeline</span>
           <h3 className="text-2xl font-extrabold text-white mt-2 font-mono">
-            {formatCr(metrics.activePipelineVal)}
+            <RunningNumber value={metrics.activePipelineVal} formatter={formatCr} />
           </h3>
           <p className="text-[10px] text-slate-500 mt-1 font-medium">Excluding won & lost deals</p>
         </div>
@@ -960,7 +961,9 @@ export default function PipelineTab() {
         {/* Metric 2 */}
         <div className="bg-[#0c1220]/60 border border-white/5 rounded-2xl p-5 hover:border-indigo-500/20 transition duration-300">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Leads</span>
-          <h3 className="text-2xl font-extrabold text-white mt-2 font-mono">{metrics.totalOpportunities}</h3>
+          <h3 className="text-2xl font-extrabold text-white mt-2 font-mono">
+            <RunningNumber value={metrics.totalOpportunities} />
+          </h3>
           <p className="text-[10px] text-slate-500 mt-1 font-medium">Opportunities registered</p>
         </div>
 
@@ -968,7 +971,7 @@ export default function PipelineTab() {
         <div className="bg-[#0c1220]/60 border border-white/5 rounded-2xl p-5 hover:border-emerald-500/20 transition duration-300">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Revenue Won</span>
           <h3 className="text-2xl font-extrabold text-white mt-2 font-mono">
-            {formatCr(metrics.revenueWon)}
+            <RunningNumber value={metrics.revenueWon} formatter={formatCr} />
           </h3>
           <p className="text-[10px] text-emerald-400 mt-1 font-medium">Won deal budgets</p>
         </div>
@@ -976,7 +979,9 @@ export default function PipelineTab() {
         {/* Metric 4 */}
         <div className="bg-[#0c1220]/60 border border-white/5 rounded-2xl p-5 hover:border-purple-500/20 transition duration-300">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Win Rate</span>
-          <h3 className="text-2xl font-extrabold text-white mt-2 font-mono">{metrics.winRate}%</h3>
+          <h3 className="text-2xl font-extrabold text-white mt-2 font-mono">
+            <RunningNumber value={metrics.winRate} />%
+          </h3>
           <p className="text-[10px] text-slate-500 mt-1 font-medium">Won / Closed ratios</p>
         </div>
       </div>

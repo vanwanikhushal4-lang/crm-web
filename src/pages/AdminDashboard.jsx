@@ -23,7 +23,7 @@ import { getAllUsers } from '../api/apiFunctions/Login/Login_api_function';
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('adminActiveTab') || 'attendance';
+    return localStorage.getItem('adminActiveTab') || 'overview';
   });
 
   const handleTabChange = (tab) => {

@@ -32,6 +32,7 @@ import {
 } from '../../api/apiFunctions/Login/Login_api_function';
 
 import { parseBudgetToCr, formatCr } from './PipelineTab';
+import RunningNumber from '../common/RunningNumber';
 
 export default function CommandCenter({
   setActiveTab,
@@ -600,7 +601,7 @@ export default function CommandCenter({
           </div>
           <div className="my-3">
             <h3 className="text-3xl font-extrabold text-white font-mono group-hover:scale-105 transition-transform duration-300 inline-block">
-              {todayMomsCount}
+              <RunningNumber value={todayMomsCount} />
             </h3>
           </div>
           <div className="text-[10px] text-slate-500 font-medium">Logged client MOM touchpoints today</div>
@@ -614,7 +615,7 @@ export default function CommandCenter({
           </div>
           <div className="my-3">
             <h3 className="text-3xl font-extrabold text-white font-mono group-hover:scale-105 transition-transform duration-300 inline-block">
-              {dealsWonCount}
+              <RunningNumber value={dealsWonCount} />
             </h3>
           </div>
           <div className="text-[10px] text-slate-500 font-medium">Total pipeline items in WON stage</div>

@@ -18,6 +18,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { getAllLeads, getAllUsers } from '../../api/apiFunctions/Login/Login_api_function';
+import RunningNumber from '../../components/common/RunningNumber';
 
 // Safe list extraction helper to match nested database schemas
 const extractList = (response) => {
@@ -606,7 +607,7 @@ export default function ChiefAdminLeadsDashboard() {
             <p className="text-muted" style={{ fontSize: '11px' }}>Last 6 months cumulative pipeline value</p>
           </div>
           <div style={{ fontSize: '11px', color: '#60a5fa', fontWeight: '600' }}>
-            Period Total: {formatValue(lastSixMonthsCumulative[5]?.cumulativeValue || 0)}
+            Period Total: <RunningNumber value={lastSixMonthsCumulative[5]?.cumulativeValue || 0} formatter={formatValue} />
           </div>
         </div>
 
@@ -675,11 +676,11 @@ export default function ChiefAdminLeadsDashboard() {
                 />
               </svg>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{targetMetrics.dealsPct}%</span>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}><RunningNumber value={targetMetrics.dealsPct} />%</span>
               </div>
             </div>
             <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8' }}>Deals Target</span>
-            <span style={{ fontSize: '10px', color: '#64748b' }}>({targetMetrics.actualDeals} / {targetMetrics.targetDeals})</span>
+            <span style={{ fontSize: '10px', color: '#64748b' }}>(<RunningNumber value={targetMetrics.actualDeals} /> / <RunningNumber value={targetMetrics.targetDeals} />)</span>
           </div>
 
           <div className="flex flex-col items-center gap-2">
@@ -701,11 +702,11 @@ export default function ChiefAdminLeadsDashboard() {
                 />
               </svg>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{targetMetrics.valuePct}%</span>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}><RunningNumber value={targetMetrics.valuePct} />%</span>
               </div>
             </div>
             <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8' }}>Valuation Target</span>
-            <span style={{ fontSize: '10px', color: '#64748b' }}>({formatValue(targetMetrics.actualValue)} / {formatValue(targetMetrics.targetValue)})</span>
+            <span style={{ fontSize: '10px', color: '#64748b' }}>(<RunningNumber value={targetMetrics.actualValue} formatter={formatValue} /> / <RunningNumber value={targetMetrics.targetValue} formatter={formatValue} />)</span>
           </div>
         </div>
       </div>
@@ -840,7 +841,9 @@ export default function ChiefAdminLeadsDashboard() {
             }}>
               <div>
                 <p className="text-muted" style={{ fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Grand Total Pipeline</p>
-                <h2 style={{ fontSize: '28px', fontWeight: '800', marginTop: '6px', color: '#60a5fa' }}>{formatValue(summary.grandTotal)}</h2>
+                <h2 style={{ fontSize: '28px', fontWeight: '800', marginTop: '6px', color: '#60a5fa' }}>
+                  <RunningNumber value={summary.grandTotal} formatter={formatValue} />
+                </h2>
                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Value of all active leads</p>
               </div>
               <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '12px', borderRadius: '12px' }}>
@@ -858,7 +861,9 @@ export default function ChiefAdminLeadsDashboard() {
             }}>
               <div>
                 <p className="text-muted" style={{ fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hot Pipeline</p>
-                <h2 style={{ fontSize: '28px', fontWeight: '800', marginTop: '6px', color: '#f43f5e' }}>{formatValue(summary.hotTotal)}</h2>
+                <h2 style={{ fontSize: '28px', fontWeight: '800', marginTop: '6px', color: '#f43f5e' }}>
+                  <RunningNumber value={summary.hotTotal} formatter={formatValue} />
+                </h2>
                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>High temperature pipeline</p>
               </div>
               <div style={{ background: 'rgba(244, 63, 94, 0.2)', padding: '12px', borderRadius: '12px' }}>
@@ -876,7 +881,9 @@ export default function ChiefAdminLeadsDashboard() {
             }}>
               <div>
                 <p className="text-muted" style={{ fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Warm Pipeline</p>
-                <h2 style={{ fontSize: '28px', fontWeight: '800', marginTop: '6px', color: '#fbbf24' }}>{formatValue(summary.warmTotal)}</h2>
+                <h2 style={{ fontSize: '28px', fontWeight: '800', marginTop: '6px', color: '#fbbf24' }}>
+                  <RunningNumber value={summary.warmTotal} formatter={formatValue} />
+                </h2>
                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Medium priority deals</p>
               </div>
               <div style={{ background: 'rgba(245, 158, 11, 0.2)', padding: '12px', borderRadius: '12px' }}>
@@ -894,7 +901,9 @@ export default function ChiefAdminLeadsDashboard() {
             }}>
               <div>
                 <p className="text-muted" style={{ fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Deals Count</p>
-                <h2 style={{ fontSize: '28px', fontWeight: '800', marginTop: '6px', color: '#e2e8f0' }}>{summary.count}</h2>
+                <h2 style={{ fontSize: '28px', fontWeight: '800', marginTop: '6px', color: '#e2e8f0' }}>
+                  <RunningNumber value={summary.count} />
+                </h2>
                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Active deals count</p>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px' }}>
@@ -1001,7 +1010,7 @@ export default function ChiefAdminLeadsDashboard() {
                       <div>
                         <p className="text-muted" style={{ fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contribution Value</p>
                         <h3 style={{ fontSize: '22px', fontWeight: '800', marginTop: '6px', color: '#60a5fa' }}>
-                          {formatValue(currentOwnerData.totalValue)}
+                          <RunningNumber value={currentOwnerData.totalValue} formatter={formatValue} />
                         </h3>
                       </div>
                     </div>
@@ -1011,7 +1020,7 @@ export default function ChiefAdminLeadsDashboard() {
                       <div>
                         <p className="text-muted" style={{ fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Pipelines</p>
                         <h3 style={{ fontSize: '22px', fontWeight: '800', marginTop: '6px', color: '#e2e8f0' }}>
-                          {currentOwnerData.totalDeals} {currentOwnerData.totalDeals === 1 ? 'Deal' : 'Deals'}
+                          <RunningNumber value={currentOwnerData.totalDeals} /> {currentOwnerData.totalDeals === 1 ? 'Deal' : 'Deals'}
                         </h3>
                       </div>
                     </div>
@@ -1021,7 +1030,7 @@ export default function ChiefAdminLeadsDashboard() {
                       <div>
                         <p className="text-muted" style={{ fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hot Pipeline</p>
                         <h3 style={{ fontSize: '22px', fontWeight: '800', marginTop: '6px', color: '#f43f5e' }}>
-                          {formatValue(currentOwnerData.hotValue)}
+                          <RunningNumber value={currentOwnerData.hotValue} formatter={formatValue} />
                         </h3>
                       </div>
                       <span style={{
@@ -1032,7 +1041,7 @@ export default function ChiefAdminLeadsDashboard() {
                         padding: '4px 8px',
                         borderRadius: '6px'
                       }}>
-                        {currentOwnerData.hotDeals} Hot
+                        <RunningNumber value={currentOwnerData.hotDeals} /> Hot
                       </span>
                     </div>
 
@@ -1041,7 +1050,7 @@ export default function ChiefAdminLeadsDashboard() {
                       <div>
                         <p className="text-muted" style={{ fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Warm Pipeline</p>
                         <h3 style={{ fontSize: '22px', fontWeight: '800', marginTop: '6px', color: '#fbbf24' }}>
-                          {formatValue(currentOwnerData.warmValue)}
+                          <RunningNumber value={currentOwnerData.warmValue} formatter={formatValue} />
                         </h3>
                       </div>
                       <span style={{
@@ -1052,7 +1061,7 @@ export default function ChiefAdminLeadsDashboard() {
                         padding: '4px 8px',
                         borderRadius: '6px'
                       }}>
-                        {currentOwnerData.warmDeals} Warm
+                        <RunningNumber value={currentOwnerData.warmDeals} /> Warm
                       </span>
                     </div>
                   </div>
@@ -1115,7 +1124,7 @@ export default function ChiefAdminLeadsDashboard() {
                           <div style={{ marginTop: '16px' }}>
                             <p className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Opportunity Valuation</p>
                             <h2 style={{ fontSize: '32px', fontWeight: '800', color: '#fbbf24', marginTop: '2px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                              {formatValue(currentOwnerData.largestValue)}
+                              <RunningNumber value={currentOwnerData.largestValue} formatter={formatValue} />
                               <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'rgba(255,255,255,0.4)' }}>value</span>
                             </h2>
                           </div>
@@ -1183,8 +1192,8 @@ export default function ChiefAdminLeadsDashboard() {
                                       <span>{rep.owner}</span>
                                     </div>
                                   </td>
-                                  <td style={{ padding: '14px 24px', fontSize: '14px', textAlign: 'center' }}>{rep.totalDeals}</td>
-                                  <td style={{ padding: '14px 24px', fontSize: '14px', fontWeight: '700', color: '#60a5fa', textAlign: 'right' }}>{formatValue(rep.totalValue)}</td>
+                                  <td style={{ padding: '14px 24px', fontSize: '14px', textAlign: 'center' }}><RunningNumber value={rep.totalDeals} /></td>
+                                  <td style={{ padding: '14px 24px', fontSize: '14px', fontWeight: '700', color: '#60a5fa', textAlign: 'right' }}><RunningNumber value={rep.totalValue} formatter={formatValue} /></td>
                                 </tr>
                               ))
                             )}
@@ -1194,10 +1203,10 @@ export default function ChiefAdminLeadsDashboard() {
                               <tr style={{ background: 'rgba(0,0,0,0.3)', borderTop: '2px solid rgba(255,255,255,0.1)' }}>
                                 <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: '700' }}>Total Combined Summary</td>
                                 <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: '700', textAlign: 'center' }}>
-                                  {summary.count}
+                                  <RunningNumber value={summary.count} />
                                 </td>
                                 <td style={{ padding: '16px 24px', fontSize: '15px', fontWeight: '800', color: '#fbbf24', textAlign: 'right' }}>
-                                  {formatValue(summary.grandTotal)}
+                                  <RunningNumber value={summary.grandTotal} formatter={formatValue} />
                                 </td>
                               </tr>
                             )}
@@ -1362,7 +1371,7 @@ export default function ChiefAdminLeadsDashboard() {
                           
                           <div style={{ textAlign: 'right' }}>
                             <p className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Valuation</p>
-                            <span style={{ fontSize: '18px', fontWeight: '800', color: '#60a5fa' }}>{formatValue(lead.value)}</span>
+                            <span style={{ fontSize: '18px', fontWeight: '800', color: '#60a5fa' }}><RunningNumber value={lead.value} formatter={formatValue} /></span>
                           </div>
                         </div>
 
