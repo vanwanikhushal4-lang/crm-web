@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { fetchTodaysDailyReport } from '../../api/Admin/SalesActivityDaily';
-import { MapPin, Image as ImageIcon, Camera, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { fetchDailyReportByDate } from '../../api/Admin/SalesActivityDaily';
+import { MapPin, Image as ImageIcon, Camera, ChevronLeft, ChevronRight, Calendar, RefreshCw, X } from 'lucide-react';
 
 const LocationLink = ({ location }) => {
   const [address, setAddress] = useState('Fetching...');
@@ -58,12 +58,11 @@ const LocationLink = ({ location }) => {
       href={`https://www.google.com/maps/search/?api=1&query=${location}`} 
       target="_blank" 
       rel="noreferrer"
-      className="flex items-center gap-2"
-      style={{ color: '#60a5fa', textDecoration: 'none', fontSize: '13px', maxWidth: '250px' }}
+      className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-xs font-medium max-w-[250px] transition-colors"
       title={address}
     >
-      <MapPin size={14} style={{ flexShrink: 0 }} /> 
-      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <MapPin className="h-3.5 w-3.5 shrink-0" /> 
+      <span className="truncate">
         {address}
       </span>
     </a>
@@ -89,12 +88,12 @@ export default function DailyAttendance() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetchTodaysDailyReport(selectedDate);
+      const res = await fetchDailyReportByDate(selectedDate);
       const list = res?.data?.data || res?.data || res || [];
       const arr = Array.isArray(list) ? list : [];
       setAttendanceData(arr);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load daily attendance report:", err);
       setError('Failed to load attendance data.');
     } finally {
       setIsLoading(false);
@@ -121,134 +120,188 @@ export default function DailyAttendance() {
     }
   };
 
+  const formatTime = (timeVal) => {
+    if (!timeVal) return null;
+    try {
+      const d = new Date(timeVal);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+    } catch (e) {}
+    return String(timeVal);
+  };
+
   return (
-    <div className="animate-fade">
-      <div className="flex justify-between items-center mb-6 header-actions">
+    <div className="space-y-6 animate-fade">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 style={{ fontSize: '24px', color: '#60a5fa' }}>Daily Attendance</h2>
-          <p className="text-muted">Live tracking of check-ins, locations, and selfies.</p>
+          <h2 className="text-xl font-bold text-slate-100">Daily Attendance</h2>
+          <p className="text-slate-400 text-sm">Live tracking of check-ins, locations, and selfies.</p>
         </div>
         
-        <div className="date-picker-group" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-          <button className="btn btn-secondary" style={{ padding: '8px', border: 'none' }} onClick={handlePrevDay}>
-            <ChevronLeft size={18} />
-          </button>
-          
-          <div style={{ position: 'relative' }}>
-            <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
-            <input 
-              type="date" 
-              className="input-field"
-              style={{ background: 'transparent', border: 'none', paddingLeft: '36px', color: '#fff', width: '150px' }}
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="flex items-center bg-[#0c1220] border border-white/10 rounded-xl p-1 shadow-sm">
+            <button 
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" 
+              onClick={handlePrevDay}
+              title="Previous Day"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            
+            <div className="relative flex items-center px-2">
+              <Calendar className="h-4 w-4 text-slate-400 absolute left-3 pointer-events-none" />
+              <input 
+                type="date" 
+                className="bg-transparent border-none pl-8 pr-2 py-1 text-slate-200 text-xs font-mono focus:outline-none cursor-pointer"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+              />
+            </div>
+
+            <button 
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" 
+              onClick={handleNextDay}
+              title="Next Day"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
 
-          <button className="btn btn-secondary" style={{ padding: '8px', border: 'none' }} onClick={handleNextDay}>
-            <ChevronRight size={18} />
+          <button 
+            className="px-4 py-2 bg-[#0c1220] hover:bg-slate-800 text-slate-200 border border-white/10 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition" 
+            onClick={loadData}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
         </div>
-
-        <button className="btn btn-secondary" onClick={loadData}>Refresh Data</button>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center items-center" style={{ height: '400px' }}>
-          <div className="text-muted">Loading attendance data...</div>
+        <div className="bg-[#0c1220] border border-white/5 rounded-2xl p-12 text-center flex items-center justify-center min-h-[350px]">
+          <div className="flex items-center gap-3 text-slate-400 text-sm">
+            <RefreshCw className="h-5 w-5 animate-spin text-blue-400" />
+            Loading attendance records...
+          </div>
         </div>
       ) : error ? (
-        <div className="glass-panel" style={{ padding: '24px', borderColor: 'var(--danger)' }}>
-          <p style={{ color: 'var(--danger)' }}>{error}</p>
-          <button className="btn btn-secondary mt-4" onClick={loadData}>Retry</button>
+        <div className="bg-[#0c1220] border border-red-500/30 rounded-2xl p-6 text-center space-y-3">
+          <p className="text-red-400 text-sm">{error}</p>
+          <button 
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition" 
+            onClick={loadData}
+          >
+            Retry Loading
+          </button>
         </div>
       ) : (
-        <div className="glass-panel responsive-table-wrapper" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)' }}>
-              <th style={{ padding: '16px', fontWeight: '600' }}>Sales Rep</th>
-              <th style={{ padding: '16px', fontWeight: '600' }}>Check In Time</th>
-              <th style={{ padding: '16px', fontWeight: '600' }}>Check In Location</th>
-              <th style={{ padding: '16px', fontWeight: '600' }}>Selfie</th>
-              <th style={{ padding: '16px', fontWeight: '600' }}>Check Out Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {attendanceData.length === 0 ? (
-              <tr>
-                <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No attendance records found for today.
-                </td>
-              </tr>
-            ) : (
-              attendanceData.map((record, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ fontWeight: '600' }}>
-                      {(() => {
-                        const fName = record?.firstname || record?.firstName || '';
-                        const lName = record?.lastname || record?.lastName || '';
-                        return `${fName} ${lName}`.trim() || record?.email || record?.salesPersonName || record?.username || `Sales Rep ${idx + 1}`;
-                      })()}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {record.userId || record.salesPersonId || record.id}</div>
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    {record.loginTime ? new Date(record.loginTime).toLocaleTimeString() : <span className="text-muted">--</span>}
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    {record.loginLocation ? (
-                      <LocationLink location={record.loginLocation} />
-                    ) : <span className="text-muted">No GPS Data</span>}
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    {record.imagePath ? (
-                      <button 
-                        className="btn btn-secondary" 
-                        style={{ padding: '6px 12px', fontSize: '12px' }}
-                        onClick={() => openImage(record.imagePath)}
-                      >
-                        <Camera size={14} /> View Photo
-                      </button>
-                    ) : <span className="text-muted">No Photo</span>}
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    {record.logoutTime ? new Date(record.logoutTime).toLocaleTimeString() : <span style={{ color: 'var(--danger)', fontSize: '13px' }}>Still Active</span>}
-                  </td>
+        <div className="bg-[#0c1220] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[750px]">
+              <thead>
+                <tr className="bg-slate-900/60 border-b border-white/5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <th className="px-6 py-4">Sales Rep</th>
+                  <th className="px-6 py-4">Check In Time</th>
+                  <th className="px-6 py-4">Check In Location</th>
+                  <th className="px-6 py-4">Selfie</th>
+                  <th className="px-6 py-4">Check Out Time</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-sm">
+                {attendanceData.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-slate-500 text-sm">
+                      No attendance records found for this date.
+                    </td>
+                  </tr>
+                ) : (
+                  attendanceData.map((record, idx) => {
+                    const fName = record?.firstname || record?.firstName || record?.first_name || '';
+                    const lName = record?.lastname || record?.lastName || record?.last_name || '';
+                    const repName = `${fName} ${lName}`.trim() || record?.email || record?.salesPersonName || record?.salespersonName || record?.username || record?.name || `Sales Rep ${idx + 1}`;
+                    const repId = record?.userId || record?.salesPersonId || record?.salespersonId || record?.user_id || record?.id || '--';
+
+                    const loginTime = record?.loginTime || record?.login_time || record?.checkInTime || record?.check_in_time || record?.checkinTime;
+                    const loginLocation = record?.loginLocation || record?.login_location || record?.checkInLocation || record?.check_in_location || record?.checkinLocation || record?.location;
+                    const photoUrl = record?.imagePath || record?.image_path || record?.selfie || record?.selfieUrl || record?.photo || record?.photoUrl;
+                    const logoutTime = record?.logoutTime || record?.logout_time || record?.checkOutTime || record?.check_out_time || record?.checkoutTime;
+
+                    return (
+                      <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-slate-200">
+                            {repName}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-300 font-mono text-xs">
+                          {formatTime(loginTime) || <span className="text-slate-500">--</span>}
+                        </td>
+                        <td className="px-6 py-4">
+                          {loginLocation ? (
+                            <LocationLink location={loginLocation} />
+                          ) : <span className="text-slate-500 text-xs">No GPS Data</span>}
+                        </td>
+                        <td className="px-6 py-4">
+                          {photoUrl ? (
+                            <button 
+                              className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition" 
+                              onClick={() => openImage(photoUrl)}
+                            >
+                              <Camera className="h-3.5 w-3.5 text-blue-400" /> View Photo
+                            </button>
+                          ) : <span className="text-slate-500 text-xs">No Photo</span>}
+                        </td>
+                        <td className="px-6 py-4">
+                          {logoutTime ? (
+                            <span className="text-slate-300 font-mono text-xs">
+                              {formatTime(logoutTime)}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full text-xs font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                              Still Active
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* Image Modal */}
       {selectedImage && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '24px'
-        }} onClick={() => setSelectedImage(null)}>
-          <div style={{ position: 'relative', background: '#000', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div 
+            className="relative bg-[#0c1220] border border-white/10 rounded-2xl p-3 max-w-2xl w-full shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 mb-3">
+              <h4 className="text-sm font-semibold text-slate-200">Attendance Photo Verification</h4>
+              <button 
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                onClick={() => setSelectedImage(null)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
             <img 
               src={selectedImage} 
               alt="Attendance Selfie" 
-              style={{ maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain', borderRadius: '8px' }}
+              className="max-h-[75vh] w-full object-contain rounded-xl bg-black/50"
               onError={(e) => {
                 e.target.onerror = null; 
                 e.target.src = 'https://via.placeholder.com/400x600?text=Image+Not+Found+On+Server';
               }}
             />
-            <button 
-              className="btn" 
-              style={{ position: 'absolute', top: '-16px', right: '-16px', borderRadius: '50%', padding: '8px' }}
-              onClick={() => setSelectedImage(null)}
-            >
-              ✕
-            </button>
           </div>
         </div>
       )}

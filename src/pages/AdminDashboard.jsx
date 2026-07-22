@@ -1,9 +1,24 @@
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Map, BarChart3, LogOut, Search, Clock, CalendarDays, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { 
+  Users, 
+  Map, 
+  BarChart3, 
+  LogOut, 
+  Search, 
+  Clock, 
+  CalendarDays, 
+  Menu, 
+  X,
+  ChevronLeft,
+  ChevronRight,
+  User
+} from 'lucide-react';
+import bizdriveLogo from '../assets/BIZDRIVE-LOGO.png';
 import DailyAttendance from './Admin/DailyAttendance';
 import SalespersonActivity from './Admin/SalespersonActivity';
 import ChiefAdminLeadsDashboard from './Admin/ChiefAdminLeadsDashboard';
+import { getAllUsers } from '../api/apiFunctions/Login/Login_api_function';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -15,135 +30,325 @@ export default function AdminDashboard() {
     setActiveTab(tab);
     localStorage.setItem('adminActiveTab', tab);
   };
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const [userName, setUserName] = useState(() => {
+    return localStorage.getItem('userName') || 'Admin User';
+  });
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Live clock
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // User details fetch
+  useEffect(() => {
+    const storedName = localStorage.getItem('userName');
+    const userId = localStorage.getItem('userId');
+    if ((!storedName || storedName === 'Admin User' || storedName === 'Sales Manager') && userId) {
+      getAllUsers().then((res) => {
+        const arr = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const current = arr.find(u => String(u.id || u.userId) === String(userId));
+        if (current) {
+          const first = String(current.firstName || current.firstname || current.first_name || '').trim();
+          const last = String(current.lastName || current.lastname || current.last_name || '').trim();
+          const fullName = `${first} ${last}`.trim() || current.name || current.username || current.email || '';
+          if (fullName) {
+            localStorage.setItem('userName', fullName);
+            setUserName(fullName);
+          }
+        }
+      }).catch(err => console.error("Error loading admin user name:", err));
+    }
+  }, []);
+
+  const navigationItems = [
+    { id: 'overview', label: 'Overview', icon: BarChart3 },
+    { id: 'attendance', label: 'Daily Attendance', icon: Clock },
+    { id: 'tracking', label: 'Live Map Tracking', icon: Map },
+    { id: 'sales-calendar', label: 'Calendars', icon: CalendarDays },
+    { id: 'approvals', label: 'User Approvals', icon: Users },
+  ];
+
+  const getTabTitle = (tab) => {
+    switch (tab) {
+      case 'overview':
+        return 'Overview Pipeline';
+      case 'attendance':
+        return 'Daily Attendance';
+      case 'tracking':
+        return 'Live Field Map Tracking';
+      case 'sales-calendar':
+        return 'Calendars & Sales Activity';
+      case 'approvals':
+        return 'User Approvals';
+      default:
+        return 'Admin Portal';
+    }
+  };
 
   return (
-    <div className="dashboard-layout" style={{ display: 'flex', height: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', position: 'relative' }}>
+    <div className="flex h-screen bg-[#070b13] text-slate-100 font-sans overflow-hidden">
       
-      {/* Backdrop overlay for mobile sidebar */}
-      {isSidebarOpen && (
-        <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)} />
+      {/* SIDEBAR FOR DESKTOP */}
+      <aside className={`desktop-sidebar-nav hidden lg:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-[#0c1220] border-r border-white/5 p-6 justify-between shrink-0 transition-all duration-300 ease-in-out`}>
+        <div className="space-y-8">
+          {/* Logo / Branding */}
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="h-10 w-10 shrink-0 flex items-center justify-center bg-white rounded-xl p-1 shadow-md">
+                <img src={bizdriveLogo} alt="Biz Drive CRM Logo" className="h-full w-full object-contain" />
+              </div>
+              {!isSidebarCollapsed && (
+                <div className="animate-fade">
+                  <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Biz Drive CRM</h1>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Admin Portal</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Desktop Collapse Trigger */}
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </button>
+          </div>
+
+          {/* Navigation Links */}
+          <nav className="space-y-1">
+            {navigationItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabChange(item.id)}
+                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium transition-all duration-300 ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
+                      : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                  }`}
+                  title={isSidebarCollapsed ? item.label : undefined}
+                >
+                  <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                  {!isSidebarCollapsed && <span className="animate-fade truncate">{item.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* User Card & Logout */}
+        <div className="border-t border-white/5 pt-6 space-y-4">
+          <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2'}`}>
+            <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center shrink-0">
+              <User className="h-5 w-5 text-blue-400" />
+            </div>
+            {!isSidebarCollapsed && (
+              <div className="overflow-hidden animate-fade">
+                <p className="text-sm font-semibold text-slate-200 truncate">{userName}</p>
+                <p className="text-xs text-slate-500 truncate">Administrator</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              localStorage.clear();
+              navigate('/login');
+            }}
+            className={`w-full flex items-center justify-center ${isSidebarCollapsed ? 'px-0' : 'gap-2 px-4'} py-2.5 rounded-xl border border-white/5 hover:border-red-500/20 text-xs font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-all duration-300`}
+            title={isSidebarCollapsed ? "Sign Out" : undefined}
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!isSidebarCollapsed && <span className="animate-fade">Sign Out</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* MOBILE BACKDROP */}
+      {isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)} 
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden animate-fade"
+        />
       )}
 
-      {/* Sidebar */}
-      <div className={`flex-col glass-panel sidebar-layout ${isSidebarOpen ? 'open' : ''}`} style={{ width: '280px', padding: '24px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="title-gradient" style={{ fontSize: '24px' }}>Admin</h2>
-          <button 
-            className="mobile-header"
-            onClick={() => setIsSidebarOpen(false)}
-            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
-          >
-            <X size={20} />
-          </button>
-        </div>
-        
-        <div className="flex-col gap-2" style={{ flex: 1 }}>
-          <button className={`btn ${activeTab === 'overview' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            handleTabChange('overview');
-            setIsSidebarOpen(false);
-          }}>
-            <BarChart3 size={18} /> Overview
-          </button>
-          <button className={`btn ${activeTab === 'tracking' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            handleTabChange('tracking');
-            setIsSidebarOpen(false);
-          }}>
-            <Map size={18} /> Live Map Tracking
-          </button>
-          <button className={`btn ${activeTab === 'attendance' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            handleTabChange('attendance');
-            setIsSidebarOpen(false);
-          }}>
-            <Clock size={18} /> Daily Attendance
-          </button>
-          <button className={`btn ${activeTab === 'sales-calendar' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            handleTabChange('sales-calendar');
-            setIsSidebarOpen(false);
-          }}>
-            <CalendarDays size={18} />  Calendars
-          </button>
-          <button className={`btn ${activeTab === 'approvals' ? '' : 'btn-secondary'} justify-start`} style={{ width: '100%' }} onClick={() => {
-            handleTabChange('approvals');
-            setIsSidebarOpen(false);
-          }}>
-            <Users size={18} /> User Approvals
-          </button>
+      {/* MOBILE SIDEBAR DRAWER */}
+      <aside 
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0c1220] border-r border-white/5 p-6 flex flex-col justify-between lg:hidden transform transition-transform duration-300 ease-in-out ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="space-y-8">
+          {/* Logo / Branding / Close */}
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 shrink-0 flex items-center justify-center bg-white rounded-xl p-1 shadow-md">
+                <img src={bizdriveLogo} alt="Biz Drive CRM Logo" className="h-full w-full object-contain" />
+              </div>
+              <div>
+                <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Biz Drive CRM</h1>
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Admin Portal</span>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Navigation Links */}
+          <nav className="space-y-1">
+            {navigationItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    handleTabChange(item.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
+                      : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                  }`}
+                >
+                  <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
-        <button className="btn btn-secondary justify-start" style={{ width: '100%', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.2)' }} onClick={() => {
-          localStorage.clear();
-          navigate('/login');
-        }}>
-          <LogOut size={18} /> Sign Out
-        </button>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-col content-layout" style={{ flex: 1, padding: '32px', overflowY: 'auto', overflowX: 'hidden' }}>
-        
-        {/* Mobile Header Bar */}
-        <div className="mobile-header" style={{ 
-          alignItems: 'center', 
-          gap: '12px', 
-          padding: '12px 16px', 
-          background: 'rgba(30, 41, 59, 0.4)', 
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '12px',
-          marginBottom: '20px'
-        }}>
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            style={{ 
-              background: 'transparent', 
-              border: 'none', 
-              color: '#fff', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center',
-              padding: '6px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)'
+        {/* User Card & Logout */}
+        <div className="border-t border-white/5 pt-6 space-y-4">
+          <div className="flex items-center gap-3 px-2">
+            <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center">
+              <User className="h-5 w-5 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-200 truncate">{userName}</p>
+              <p className="text-xs text-slate-500 truncate">Administrator</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.clear();
+              navigate('/login');
             }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/5 hover:border-red-500/20 text-xs font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-all duration-300"
           >
-            <Menu size={20} />
+            <LogOut className="h-4 w-4" />
+            Sign Out
           </button>
-          <span style={{ fontSize: '16px', fontWeight: '700', textTransform: 'capitalize', color: '#fff' }}>
-            {activeTab === 'overview' ? 'Leads Pipeline Dashboard' : (activeTab === 'sales-calendar' ? 'Calendars' : activeTab.replace('-', ' '))}
-          </span>
         </div>
+      </aside>
 
-        {activeTab === 'attendance' && <DailyAttendance />}
+      {/* MAIN CONTAINER */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         
-        {activeTab === 'sales-calendar' && <SalespersonActivity />}
-        
-        {activeTab === 'tracking' && (
-          <>
-            <div className="flex justify-between items-center mb-6">
-              <h1 style={{ fontSize: '28px' }}>Live Field Tracking</h1>
-              
-              <div style={{ position: 'relative', width: '300px' }}>
-                <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
-                <input type="text" className="input-field" placeholder="Search sales managers..." style={{ paddingLeft: '40px' }} />
-              </div>
+        {/* TOP HEADER */}
+        <header className="flex items-center justify-between px-6 py-4 bg-[#070b13]/80 backdrop-blur-md border-b border-white/5 shrink-0 z-10">
+          <div className="flex items-center gap-3">
+            <Menu 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="h-5 w-5 text-slate-400 lg:hidden cursor-pointer hover:text-white transition" 
+            />
+            <h2 className="text-lg font-bold text-slate-100 capitalize">
+              {getTabTitle(activeTab)}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Search Input Bar */}
+            <div className="relative hidden sm:block">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search managers, reports..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-1.5 w-64 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500/50 transition-colors text-slate-200 placeholder-slate-500"
+              />
             </div>
 
-            <div className="glass-panel animate-fade" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.8)' }}>
-              <div className="flex-col items-center">
-                <Map size={48} color="#3b82f6" style={{ marginBottom: '16px', opacity: 0.8 }} />
-                <p className="text-muted" style={{ fontSize: '16px' }}>Interactive Map Component will render here</p>
-                <p style={{ fontSize: '14px', color: '#64748b', marginTop: '8px' }}>Tracking 12 active sales managers in the field</p>
+            {/* Live Clock */}
+            <div className="text-xs text-slate-400 bg-slate-900/40 border border-white/5 px-3 py-1.5 rounded-lg font-mono">
+              {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </div>
+          </div>
+        </header>
+
+        {/* CONTAINER CONTENT */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+          
+          {activeTab === 'attendance' && <DailyAttendance />}
+          
+          {activeTab === 'sales-calendar' && <SalespersonActivity />}
+          
+          {activeTab === 'tracking' && (
+            <div className="space-y-6 animate-fade">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h1 className="text-xl font-bold text-slate-100">Live Field Tracking</h1>
+                  <p className="text-slate-400 text-sm">Real-time GPS tracking of active sales representatives</p>
+                </div>
+                
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input 
+                    type="text" 
+                    className="w-full pl-9 pr-4 py-2 bg-[#0c1220] border border-white/10 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500/50" 
+                    placeholder="Search sales managers..." 
+                  />
+                </div>
+              </div>
+
+              <div className="bg-[#0c1220] border border-white/5 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[450px]">
+                <div className="h-16 w-16 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center mb-4">
+                  <Map className="h-8 w-8 text-blue-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-200 mb-1">Interactive Field Map</h3>
+                <p className="text-slate-400 text-sm max-w-md mb-4">
+                  Real-time live map tracking component will display live field locations and route breadcrumbs.
+                </p>
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                  Tracking 12 Active Representatives
+                </span>
               </div>
             </div>
-          </>
-        )}
+          )}
 
-        {activeTab === 'overview' && <ChiefAdminLeadsDashboard />}
-        
-        {activeTab === 'approvals' && (
-           <div className="flex justify-center items-center h-full"><p className="text-muted">Pending User Approvals (Coming Soon)</p></div>
-        )}
-      </div>
+          {activeTab === 'overview' && <ChiefAdminLeadsDashboard />}
+          
+          {activeTab === 'approvals' && (
+            <div className="bg-[#0c1220] border border-white/5 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[400px] animate-fade">
+              <div className="h-16 w-16 rounded-2xl bg-slate-800 border border-white/10 flex items-center justify-center mb-4">
+                <Users className="h-8 w-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-200 mb-1">User Approvals</h3>
+              <p className="text-slate-400 text-sm max-w-md">
+                No pending user registration approvals found. New account requests will appear here.
+              </p>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
+
