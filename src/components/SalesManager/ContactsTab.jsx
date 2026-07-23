@@ -183,10 +183,46 @@ export default function ContactsTab() {
     return colors[code % colors.length];
   };
 
-  // Extract unique options for filter dropdowns
+  // Extract unique options for filter dropdowns & autocomplete suggestions
   const uniqueCompanies = Array.from(
-    new Set(contacts.map((c) => (c.companyName || 'Unassigned corporate').trim()).filter(Boolean))
-  ).sort();
+    new Set([
+      ...companies.map((c) => (typeof c === 'string' ? c : c?.name || c?.companyName || c?.label || '').trim()),
+      ...contacts.map((c) => (c.companyName || '').trim())
+    ].filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+  // Handle company selection/change and auto-fetch existing company address
+  const handleCompanyNameChange = (val) => {
+    const trimmed = val.trim().toLowerCase();
+
+    // Look up address in existing contact records first
+    const matchedContact = contacts.find((c) => {
+      const cName = (c.companyName || '').trim().toLowerCase();
+      return cName === trimmed;
+    });
+
+    // Look up in companies database array if not found in contacts
+    const matchedCompany = companies.find((comp) => {
+      const name = (typeof comp === 'string' ? comp : comp?.name || comp?.companyName || comp?.label || '').trim().toLowerCase();
+      return name === trimmed;
+    });
+
+    const autoAddress =
+      matchedContact?.companyAddress ||
+      matchedContact?.address ||
+      matchedContact?.locationName ||
+      matchedContact?.company_address ||
+      matchedContact?.city ||
+      (typeof matchedCompany === 'object'
+        ? matchedCompany?.companyAddress || matchedCompany?.address || matchedCompany?.locationName || matchedCompany?.city
+        : '');
+
+    setContactForm((prev) => ({
+      ...prev,
+      companyName: val,
+      ...(autoAddress ? { address: autoAddress } : {})
+    }));
+  };
 
   const uniqueDesignations = Array.from(
     new Set(contacts.map((c) => (c.designation || 'Representative').trim()).filter(Boolean))
@@ -407,19 +443,32 @@ export default function ContactsTab() {
     try {
       const payload = {
         id: selectedContact.id,
+        userId: selectedContact.userId || localStorage.getItem('userId') || '',
+        companyId: selectedContact.companyId,
         firstName: contactForm.firstName.trim(),
         lastName: contactForm.lastName.trim(),
         designation: contactForm.designation.trim(),
         customerType: contactForm.customerType.trim(),
         companyName: contactForm.companyName.trim(),
+        company_name: contactForm.companyName.trim(),
         address: contactForm.address.trim(),
-        companyAddress: contactForm.address.trim(), // Support backend key mismatch
+        companyAddress: contactForm.address.trim(),
+        company_address: contactForm.address.trim(),
+        locationName: contactForm.address.trim(),
+        city: contactForm.address.trim(),
         email: contactForm.email.trim(),
         phoneNo: phoneNoClean,
         name: `${contactForm.firstName} ${contactForm.lastName}`.trim(),
         contactPerson: `${contactForm.firstName} ${contactForm.lastName}`.trim()
       };
       
+      // Save/Update company details & address mapping via saveCustomerWithCompany
+      try {
+        await saveCustomerWithCompany(payload);
+      } catch (saveErr) {
+        console.warn('saveCustomerWithCompany update fallback warning:', saveErr);
+      }
+
       await updateCustomer(payload);
       alert('Customer contact updated successfully!');
       setShowEditModal(false);
@@ -1066,12 +1115,18 @@ export default function ContactsTab() {
                 <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Company Account Name (Required)</label>
                 <input
                   type="text"
+                  list="company-suggestions-list"
                   placeholder="Acme Corporation"
                   value={contactForm.companyName}
-                  onChange={(e) => setContactForm({ ...contactForm, companyName: e.target.value })}
+                  onChange={(e) => handleCompanyNameChange(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
                   required
                 />
+                <datalist id="company-suggestions-list">
+                  {uniqueCompanies.map((comp) => (
+                    <option key={comp} value={comp} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1196,8 +1251,9 @@ export default function ContactsTab() {
                 <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Company Account Name (Required)</label>
                 <input
                   type="text"
+                  list="company-suggestions-list"
                   value={contactForm.companyName}
-                  onChange={(e) => setContactForm({ ...contactForm, companyName: e.target.value })}
+                  onChange={(e) => handleCompanyNameChange(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
                   required
                 />
