@@ -32,6 +32,7 @@ import {
   createCustomerMaster,
   saveCustomerWithCompany,
   updateCustomer,
+  updateCustomerWithCompany,
   deleteCustomerById,
   uploadCustomersExcel,
   saveMeetingLog,
@@ -442,34 +443,21 @@ export default function ContactsTab() {
 
     try {
       const payload = {
-        id: selectedContact.id,
-        userId: selectedContact.userId || localStorage.getItem('userId') || '',
-        companyId: selectedContact.companyId,
         firstName: contactForm.firstName.trim(),
         lastName: contactForm.lastName.trim(),
         designation: contactForm.designation.trim(),
-        customerType: contactForm.customerType.trim(),
-        companyName: contactForm.companyName.trim(),
-        company_name: contactForm.companyName.trim(),
-        address: contactForm.address.trim(),
-        companyAddress: contactForm.address.trim(),
-        company_address: contactForm.address.trim(),
-        locationName: contactForm.address.trim(),
-        city: contactForm.address.trim(),
         email: contactForm.email.trim(),
         phoneNo: phoneNoClean,
+        customerType: contactForm.customerType.trim(),
+        companyName: contactForm.companyName.trim(),
+        companyAddress: contactForm.address.trim(),
+        // Fallback property mapping
+        address: contactForm.address.trim(),
         name: `${contactForm.firstName} ${contactForm.lastName}`.trim(),
         contactPerson: `${contactForm.firstName} ${contactForm.lastName}`.trim()
       };
       
-      // Save/Update company details & address mapping via saveCustomerWithCompany
-      try {
-        await saveCustomerWithCompany(payload);
-      } catch (saveErr) {
-        console.warn('saveCustomerWithCompany update fallback warning:', saveErr);
-      }
-
-      await updateCustomer(payload);
+      await updateCustomerWithCompany(selectedContact.id, payload);
       alert('Customer contact updated successfully!');
       setShowEditModal(false);
       setSelectedContact(null);

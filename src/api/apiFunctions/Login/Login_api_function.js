@@ -204,10 +204,24 @@ export const getAllMeetingLogs = async () => {
   }
 };
 
+export const updateCustomerWithCompany = async (id, payload) => {
+  try {
+    const res = await apiMethods.put(
+      `${CUSTOMER_MASTER_BASE_URL}/customerMaster/updateCustomerWithCompany/${id}`,
+      payload
+    );
+    return res;
+  } catch (error) {
+    console.error('Update Customer With Company API Error:', error);
+    throw error;
+  }
+};
+
 export const updateCustomer = async (payload) => {
   try {
-    const res = await apiMethods.post(
-      `${CUSTOMER_MASTER_BASE_URL}/customerMaster/updateCustomer`,
+    const id = payload.id;
+    const res = await apiMethods.put(
+      `${CUSTOMER_MASTER_BASE_URL}/customerMaster/updateCustomerWithCompany/${id}`,
       payload
     );
     return res;
