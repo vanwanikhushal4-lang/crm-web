@@ -26,7 +26,7 @@ import CalendarTab from '../components/SalesManager/CalendarTab';
 import PipelineTab from '../components/SalesManager/PipelineTab';
 import ContactsTab from '../components/SalesManager/ContactsTab';
 import ShareContactTab from '../components/SalesManager/ShareContactTab';
-import DssrTab from '../components/SalesManager/DssrTab';
+import DssrTab from './Admin/DssrTab';
 
 
 
@@ -66,7 +66,7 @@ export default function SalesManagerDashboard() {
   }, []);
 
   const [currentTime, setCurrentTime] = useState(new Date());
-  
+
   // Shared modals state
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -133,10 +133,10 @@ export default function SalesManagerDashboard() {
     { id: 'contacts', label: 'Contacts', icon: Users },
     { id: 'shareContact', label: 'Share Contact', icon: Share2 },
   ];
-  
+
   return (
     <div className="flex h-screen bg-[#070b13] text-slate-100 font-sans overflow-hidden">
-      
+
       {/* SIDEBAR FOR DESKTOP */}
       <aside className={`desktop-sidebar-nav hidden lg:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-[#0c1220] border-r border-white/5 p-6 justify-between shrink-0 transition-all duration-300 ease-in-out`}>
         <div className="space-y-8">
@@ -153,9 +153,9 @@ export default function SalesManagerDashboard() {
                 </div>
               )}
             </div>
-            
+
             {/* Desktop Collapse Trigger */}
-            <button 
+            <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
               title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -173,11 +173,10 @@ export default function SalesManagerDashboard() {
                 <button
                   key={item.id}
                   onClick={() => handleTabChange(item.id)}
-                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium transition-all duration-300 ${
-                    isActive
+                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium transition-all duration-300 ${isActive
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
                       : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
-                  }`}
+                    }`}
                   title={isSidebarCollapsed ? item.label : undefined}
                 >
                   <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
@@ -214,17 +213,16 @@ export default function SalesManagerDashboard() {
 
       {/* MOBILE BACKDROP */}
       {isMobileMenuOpen && (
-        <div 
-          onClick={() => setIsMobileMenuOpen(false)} 
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
           className="mobile-sidebar-drawer fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden animate-fade"
         />
       )}
 
       {/* MOBILE SIDEBAR DRAWER */}
-      <aside 
-        className={`mobile-sidebar-drawer fixed inset-y-0 left-0 z-50 w-64 bg-[#0c1220] border-r border-white/5 p-6 flex flex-col justify-between lg:hidden transform transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+      <aside
+        className={`mobile-sidebar-drawer fixed inset-y-0 left-0 z-50 w-64 bg-[#0c1220] border-r border-white/5 p-6 flex flex-col justify-between lg:hidden transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="space-y-8">
           {/* Logo / Branding / Close */}
@@ -238,7 +236,7 @@ export default function SalesManagerDashboard() {
                 <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Sales Portal</span>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
             >
@@ -258,11 +256,10 @@ export default function SalesManagerDashboard() {
                     handleTabChange(item.id);
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${isActive
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
                       : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
                   {item.label}
@@ -295,13 +292,13 @@ export default function SalesManagerDashboard() {
 
       {/* MAIN CONTAINER */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        
+
         {/* HEADER */}
         <header className="flex items-center justify-between px-6 py-4 bg-[#070b13]/80 backdrop-blur-md border-b border-white/5 shrink-0 z-10">
           <div className="flex items-center gap-3">
-            <Menu 
+            <Menu
               onClick={() => setIsMobileMenuOpen(true)}
-              className="mobile-menu-drawer-toggle h-5 w-5 text-slate-400 lg:hidden cursor-pointer hover:text-white transition" 
+              className="mobile-menu-drawer-toggle h-5 w-5 text-slate-400 lg:hidden cursor-pointer hover:text-white transition"
             />
             <h2 className="text-lg font-bold text-slate-100 capitalize">
               {activeTab === 'home' ? 'Command Center' : activeTab}
@@ -320,9 +317,9 @@ export default function SalesManagerDashboard() {
                 className="pl-9 pr-4 py-1.5 w-64 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500/50 transition-colors"
               />
             </div>
-            
 
-            
+
+
             {/* Live Clock */}
             <div className="text-xs text-slate-400 bg-slate-900/40 border border-white/5 px-3 py-1.5 rounded-lg font-mono">
               {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -332,7 +329,7 @@ export default function SalesManagerDashboard() {
 
         {/* CONTAINER CONTENT */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          
+
           {activeTab === 'home' && (
             <CommandCenter
               deals={deals}
@@ -367,10 +364,6 @@ export default function SalesManagerDashboard() {
           {activeTab === 'shareContact' && (
             <ShareContactTab />
           )}
-
-          {/* {activeTab === 'dssr' && (
-            <DssrTab />
-          )} */}
 
         </div>
       </main>

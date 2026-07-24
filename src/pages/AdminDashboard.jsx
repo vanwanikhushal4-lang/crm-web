@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Users, 
-  Map, 
-  BarChart3, 
-  LogOut, 
-  Search, 
-  Clock, 
-  CalendarDays, 
-  Menu, 
+import {
+  Users,
+  Map,
+  BarChart3,
+  LogOut,
+  Search,
+  Clock,
+  CalendarDays,
+  Menu,
   X,
   ChevronLeft,
   ChevronRight,
-  User
+  User,
+  FileText
 } from 'lucide-react';
 import bizdriveLogo from '../assets/BIZDRIVE-LOGO.png';
 import DailyAttendance from './Admin/DailyAttendance';
 import SalespersonActivity from './Admin/SalespersonActivity';
 import ChiefAdminLeadsDashboard from './Admin/ChiefAdminLeadsDashboard';
+import DssrTab from './Admin/DssrTab';
 import { getAllUsers } from '../api/apiFunctions/Login/Login_api_function';
 
 export default function AdminDashboard() {
@@ -69,6 +71,7 @@ export default function AdminDashboard() {
 
   const navigationItems = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
+    { id: 'dssr', label: 'DSSR Activity', icon: FileText },
     { id: 'attendance', label: 'Daily Attendance', icon: Clock },
     { id: 'tracking', label: 'Live Map Tracking', icon: Map },
     { id: 'sales-calendar', label: 'Calendars', icon: CalendarDays },
@@ -79,6 +82,8 @@ export default function AdminDashboard() {
     switch (tab) {
       case 'overview':
         return 'Overview Pipeline';
+      case 'dssr':
+        return 'DSSR Activity Logs & Analytics';
       case 'attendance':
         return 'Daily Attendance';
       case 'tracking':
@@ -94,7 +99,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex h-screen bg-[#070b13] text-slate-100 font-sans overflow-hidden">
-      
+
       {/* SIDEBAR FOR DESKTOP */}
       <aside className={`desktop-sidebar-nav hidden lg:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-[#0c1220] border-r border-white/5 p-6 justify-between shrink-0 transition-all duration-300 ease-in-out`}>
         <div className="space-y-8">
@@ -111,9 +116,9 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
-            
+
             {/* Desktop Collapse Trigger */}
-            <button 
+            <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
               title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -131,11 +136,10 @@ export default function AdminDashboard() {
                 <button
                   key={item.id}
                   onClick={() => handleTabChange(item.id)}
-                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium transition-all duration-300 ${
-                    isActive
+                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium transition-all duration-300 ${isActive
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
                       : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
-                  }`}
+                    }`}
                   title={isSidebarCollapsed ? item.label : undefined}
                 >
                   <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
@@ -175,17 +179,16 @@ export default function AdminDashboard() {
 
       {/* MOBILE BACKDROP */}
       {isMobileMenuOpen && (
-        <div 
-          onClick={() => setIsMobileMenuOpen(false)} 
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden animate-fade"
         />
       )}
 
       {/* MOBILE SIDEBAR DRAWER */}
-      <aside 
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0c1220] border-r border-white/5 p-6 flex flex-col justify-between lg:hidden transform transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0c1220] border-r border-white/5 p-6 flex flex-col justify-between lg:hidden transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="space-y-8">
           {/* Logo / Branding / Close */}
@@ -199,7 +202,7 @@ export default function AdminDashboard() {
                 <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Admin Portal</span>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
             >
@@ -219,11 +222,10 @@ export default function AdminDashboard() {
                     handleTabChange(item.id);
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${isActive
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/15'
                       : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
                   {item.label}
@@ -259,13 +261,13 @@ export default function AdminDashboard() {
 
       {/* MAIN CONTAINER */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        
+
         {/* TOP HEADER */}
         <header className="flex items-center justify-between px-6 py-4 bg-[#070b13]/80 backdrop-blur-md border-b border-white/5 shrink-0 z-10">
           <div className="flex items-center gap-3">
-            <Menu 
+            <Menu
               onClick={() => setIsMobileMenuOpen(true)}
-              className="h-5 w-5 text-slate-400 lg:hidden cursor-pointer hover:text-white transition" 
+              className="h-5 w-5 text-slate-400 lg:hidden cursor-pointer hover:text-white transition"
             />
             <h2 className="text-lg font-bold text-slate-100 capitalize">
               {getTabTitle(activeTab)}
@@ -294,11 +296,13 @@ export default function AdminDashboard() {
 
         {/* CONTAINER CONTENT */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          
+
+          {activeTab === 'dssr' && <DssrTab />}
+
           {activeTab === 'attendance' && <DailyAttendance />}
-          
+
           {activeTab === 'sales-calendar' && <SalespersonActivity />}
-          
+
           {activeTab === 'tracking' && (
             <div className="space-y-6 animate-fade">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -306,13 +310,13 @@ export default function AdminDashboard() {
                   <h1 className="text-xl font-bold text-slate-100">Live Field Tracking</h1>
                   <p className="text-slate-400 text-sm">Real-time GPS tracking of active sales representatives</p>
                 </div>
-                
+
                 <div className="relative w-full sm:w-72">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <input 
-                    type="text" 
-                    className="w-full pl-9 pr-4 py-2 bg-[#0c1220] border border-white/10 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500/50" 
-                    placeholder="Search sales managers..." 
+                  <input
+                    type="text"
+                    className="w-full pl-9 pr-4 py-2 bg-[#0c1220] border border-white/10 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                    placeholder="Search sales managers..."
                   />
                 </div>
               </div>
@@ -334,7 +338,7 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === 'overview' && <ChiefAdminLeadsDashboard />}
-          
+
           {activeTab === 'approvals' && (
             <div className="bg-[#0c1220] border border-white/5 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[400px] animate-fade">
               <div className="h-16 w-16 rounded-2xl bg-slate-800 border border-white/10 flex items-center justify-center mb-4">
