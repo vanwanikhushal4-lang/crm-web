@@ -26,7 +26,8 @@ import {
   MessageSquare,
   Sparkles,
   CalendarDays,
-  Activity
+  Activity,
+  CheckSquare
 } from 'lucide-react';
 
 import {
@@ -139,7 +140,7 @@ export default function DssrTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('ALL'); // 'ALL' | 'TODAY' | 'YESTERDAY' | 'THIS_WEEK' | 'THIS_MONTH'
   const [selectedUserFilter, setSelectedUserFilter] = useState('ALL');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  const [viewMode, setViewMode] = useState('table'); // 'grid' | 'table'
 
   // Focus Detail Modal State
   const [selectedItemDetail, setSelectedItemDetail] = useState(null);
@@ -208,12 +209,15 @@ export default function DssrTab() {
   // TRANSFORMED & FILTERED DATA LISTS
   // ==========================================
 
-  // Combined Calls & Tasks Cards
+  // Calls Cards ONLY
   const allCallCards = useMemo(() => {
-    const callItems = rawCalls.map((c) => mapCallToCard(c, userMap, false));
-    const taskItems = rawTasks.map((t) => mapCallToCard(t, userMap, true));
-    return [...callItems, ...taskItems];
-  }, [rawCalls, rawTasks, userMap]);
+    return rawCalls.map((c) => mapCallToCard(c, userMap, false));
+  }, [rawCalls, userMap]);
+
+  // Tasks Cards ONLY
+  const allTaskCards = useMemo(() => {
+    return rawTasks.map((t) => mapCallToCard(t, userMap, true));
+  }, [rawTasks, userMap]);
 
   // Meeting Cards
   const allMeetingCards = useMemo(() => {
@@ -239,6 +243,25 @@ export default function DssrTab() {
     });
   }, [allCallCards, searchQuery, dateFilter, selectedUserFilter]);
 
+  // Filtered Tasks list
+  const filteredTaskCards = useMemo(() => {
+    return allTaskCards.filter((card) => {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        searchQuery === '' ||
+        card.subject.toLowerCase().includes(query) ||
+        card.accountName.toLowerCase().includes(query) ||
+        card.description.toLowerCase().includes(query) ||
+        card.repName.toLowerCase().includes(query) ||
+        card.callType.toLowerCase().includes(query);
+
+      const matchesDate = matchesDateFilter(card.rawDate, dateFilter);
+      const matchesUser = selectedUserFilter === 'ALL' || card.userId === String(selectedUserFilter);
+
+      return matchesSearch && matchesDate && matchesUser;
+    });
+  }, [allTaskCards, searchQuery, dateFilter, selectedUserFilter]);
+
   // Filtered Meetings list
   const filteredMeetingCards = useMemo(() => {
     return allMeetingCards.filter((card) => {
@@ -260,8 +283,9 @@ export default function DssrTab() {
   // Total Analytics Metrics
   const stats = useMemo(() => {
     const totalCalls = allCallCards.length;
+    const totalTasks = allTaskCards.length;
     const totalMeetings = allMeetingCards.length;
-    const totalEngagements = totalCalls + totalMeetings;
+    const totalEngagements = totalCalls + totalTasks + totalMeetings;
 
     const outgoingCalls = allCallCards.filter((c) => c.callType === 'OUTGOING').length;
     const incomingCalls = allCallCards.filter((c) => c.callType === 'INCOMING').length;
@@ -269,31 +293,38 @@ export default function DssrTab() {
 
     const activeRepsCount = new Set([
       ...allCallCards.map((c) => c.userId),
+      ...allTaskCards.map((t) => t.userId),
       ...allMeetingCards.map((m) => m.userId)
     ].filter(Boolean)).size;
 
     return {
       totalEngagements,
       totalCalls,
+      totalTasks,
       totalMeetings,
       activeRepsCount,
       outgoingCalls,
       incomingCalls,
       interestedCalls
     };
-  }, [allCallCards, allMeetingCards]);
+  }, [allCallCards, allTaskCards, allMeetingCards]);
 
   // Sales Rep Activity Leaderboard
   const repLeaderboard = useMemo(() => {
     const counts = {};
     allCallCards.forEach((c) => {
       const name = c.repName;
-      if (!counts[name]) counts[name] = { calls: 0, meetings: 0 };
+      if (!counts[name]) counts[name] = { calls: 0, tasks: 0, meetings: 0 };
       counts[name].calls += 1;
+    });
+    allTaskCards.forEach((t) => {
+      const name = t.repName;
+      if (!counts[name]) counts[name] = { calls: 0, tasks: 0, meetings: 0 };
+      counts[name].tasks += 1;
     });
     allMeetingCards.forEach((m) => {
       const name = m.repName;
-      if (!counts[name]) counts[name] = { calls: 0, meetings: 0 };
+      if (!counts[name]) counts[name] = { calls: 0, tasks: 0, meetings: 0 };
       counts[name].meetings += 1;
     });
 
@@ -301,11 +332,12 @@ export default function DssrTab() {
       .map(([name, data]) => ({
         name,
         calls: data.calls,
+        tasks: data.tasks,
         meetings: data.meetings,
-        total: data.calls + data.meetings
+        total: data.calls + data.tasks + data.meetings
       }))
       .sort((a, b) => b.total - a.total);
-  }, [allCallCards, allMeetingCards]);
+  }, [allCallCards, allTaskCards, allMeetingCards]);
   // Extracted list of Sales Managers for the filter dropdown
   const salesManagerOptions = useMemo(() => {
     const list = [];
@@ -379,6 +411,20 @@ export default function DssrTab() {
           </button>
 
           <button
+            onClick={() => setActiveSubTab('tasks')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${activeSubTab === 'tasks'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+              }`}
+          >
+            <CheckSquare className="h-4 w-4 text-amber-400" />
+            <span>All Tasks</span>
+            <span className="ml-1 bg-slate-800 px-2 py-0.5 rounded-full text-[10px] font-mono">
+              {allTaskCards.length}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('meetings')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${activeSubTab === 'meetings'
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
@@ -422,7 +468,7 @@ export default function DssrTab() {
         </div>
       )}
 
-      {/* FILTER BAR FOR CALLS & MEETINGS */}
+      {/* FILTER BAR FOR CALLS, TASKS & MEETINGS */}
       {activeSubTab !== 'dashboard' && (
         <div className="flex flex-col gap-4 bg-[#0b1628]/40 border border-white/5 p-4.5 rounded-2xl shadow-lg animate-fade">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -434,7 +480,9 @@ export default function DssrTab() {
                 type="text"
                 placeholder={
                   activeSubTab === 'calls'
-                    ? 'Search call logs, accounts, descriptions, sales rep...'
+                    ? 'Search call logs, accounts, descriptions, sales manager...'
+                    : activeSubTab === 'tasks'
+                    ? 'Search task logs, subject, accounts, sales manager...'
                     : 'Search meeting logs, companies, locations, MOM details...'
                 }
                 value={searchQuery}
@@ -516,9 +564,9 @@ export default function DssrTab() {
             <div className="text-slate-400 font-medium text-[11px] font-mono">
               Showing{' '}
               <strong className="text-white">
-                {activeSubTab === 'calls' ? filteredCallCards.length : filteredMeetingCards.length}
+                {activeSubTab === 'calls' ? filteredCallCards.length : activeSubTab === 'tasks' ? filteredTaskCards.length : filteredMeetingCards.length}
               </strong>{' '}
-              of {activeSubTab === 'calls' ? allCallCards.length : allMeetingCards.length} Records
+              of {activeSubTab === 'calls' ? allCallCards.length : activeSubTab === 'tasks' ? allTaskCards.length : allMeetingCards.length} Records
             </div>
           </div>
         </div>
@@ -831,7 +879,134 @@ export default function DssrTab() {
         </div>
       )}
 
-      {/* SECTION 3: ALL MEETINGS TAB */}
+      {/* SECTION 3: ALL TASKS TAB */}
+      {!isLoading && activeSubTab === 'tasks' && (
+        <div className="space-y-4 animate-fade">
+          {viewMode === 'grid' ? (
+            /* GRID VIEW */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTaskCards.length === 0 ? (
+                <div className="col-span-full py-16 text-center text-slate-500 border border-dashed border-white/5 rounded-2xl bg-slate-950/10 space-y-2">
+                  <CheckSquare className="h-8 w-8 text-slate-600 mx-auto opacity-40" />
+                  <p className="text-sm">No task logs match your search & filter criteria.</p>
+                  {hasActiveFilters && (
+                    <button onClick={resetFilters} className="text-xs text-blue-400 hover:underline font-semibold">
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredTaskCards.map((card) => (
+                  <div
+                    key={card.id}
+                    onClick={() => setSelectedItemDetail(card)}
+                    className="bg-[#0c1220]/60 border border-white/5 hover:border-amber-500/30 rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 cursor-pointer group shadow-md"
+                  >
+                    <div>
+                      {/* Upper badge row */}
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          TASK LOG
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {card.result}
+                        </span>
+                      </div>
+
+                      {/* Title & Account */}
+                      <h4 className="font-bold text-slate-100 text-sm group-hover:text-amber-400 transition-colors line-clamp-1">
+                        {card.subject}
+                      </h4>
+                      <p className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mt-1">
+                        <Building2 className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate">{card.accountName}</span>
+                      </p>
+
+                      {/* Description snippet */}
+                      <p className="text-xs text-slate-400 mt-3 bg-slate-900/60 p-2.5 rounded-xl border border-white/5 line-clamp-2">
+                        {card.description}
+                      </p>
+                    </div>
+
+                    {/* Footer Rep info */}
+                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <User className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate">{card.repName}</span>
+                      </span>
+                      <span className="font-mono text-slate-500">{card.formattedDate}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            /* TABLE VIEW */
+            <div className="bg-[#0c1220]/60 border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-900/80 border-b border-white/10 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <th className="py-3.5 px-5">Task & Subject</th>
+                      <th className="py-3.5 px-5">Account / Client</th>
+                      <th className="py-3.5 px-5">Status</th>
+                      <th className="py-3.5 px-5">Sales Manager</th>
+                      <th className="py-3.5 px-5">Date & Time</th>
+                      <th className="py-3.5 px-5 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-xs text-slate-200">
+                    {filteredTaskCards.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="py-12 text-center text-slate-500">
+                          No task logs found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTaskCards.map((card) => (
+                        <tr key={card.id} className="hover:bg-slate-900/60 transition">
+                          <td className="py-3.5 px-5 font-semibold">
+                            <div>
+                              <div className="text-slate-100 text-sm font-bold">{card.subject}</div>
+                              <span className="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded-full inline-block mt-0.5">
+                                TASK LOG
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-5 text-slate-300 font-medium">
+                            {card.accountName}
+                          </td>
+                          <td className="py-3.5 px-5">
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              {card.result}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-5 text-slate-300 font-medium">
+                            {card.repName}
+                          </td>
+                          <td className="py-3.5 px-5 text-slate-400 font-mono">
+                            {card.formattedDate} {card.formattedTime}
+                          </td>
+                          <td className="py-3.5 px-5 text-center">
+                            <button
+                              onClick={() => setSelectedItemDetail(card)}
+                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-semibold text-xs transition"
+                            >
+                              Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SECTION 4: ALL MEETINGS TAB */}
       {!isLoading && activeSubTab === 'meetings' && (
         <div className="space-y-4 animate-fade">
           {viewMode === 'grid' ? (
