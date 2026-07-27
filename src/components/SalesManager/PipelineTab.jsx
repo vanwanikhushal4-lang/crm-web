@@ -447,12 +447,20 @@ export default function PipelineTab() {
     });
 
     // 6. Pass 2: Create rows for MOM-only customers (no lead entry)
+    let momOnlyCount = 0;
     Object.entries(customerMap).forEach(([customerId, customer]) => {
       if (customersWithLeadRows.has(customerId)) return;
       const mom = latestMomByCustomer[customerId];
       if (mom) {
         rows.push(createRow(`mom-${customerId}-${mom.id || 'latest'}`, null, customer, mom, 0));
+        momOnlyCount++;
       }
+    });
+
+    console.log('📊 Pipeline API Lead Breakdown:', {
+      'Direct Leads (GET /lead/getLeads)': leads.length,
+      'MOM-only Accounts (GET /getAllMomDetails)': momOnlyCount,
+      'Total Unified Leads': rows.length
     });
 
     setUnifiedLeads(rows);
@@ -1045,126 +1053,62 @@ export default function PipelineTab() {
         </div>
       </div>
 
-      {/* CONTROLS: SEARCH & filters bar */}
-      <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between border-b border-white/5 pb-4">
+      {/* CONTROLS: SEARCH & COUNT BAR */}
+      <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between border-b border-white/5 pb-4">
         
-        {/* Text query input */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search company, contact, products, city..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900/60 border border-white/5 text-sm text-slate-100 focus:outline-none focus:border-blue-500/50"
-          />
+        <div className="flex items-center gap-3 flex-1 max-w-xl">
+          {/* Text query input */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search company, contact, products, city..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900/60 border border-white/5 text-sm text-slate-100 focus:outline-none focus:border-blue-500/50"
+            />
+          </div>
+
+          {/* Lead Count Badge */}
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/60 border border-white/5 shrink-0 select-none">
+            <span className="text-xs font-semibold text-slate-400">Total Leads:</span>
+            <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
+              {unifiedLeads.length}
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 self-end lg:self-auto">
-          {/* Advanced filters sheet trigger */}
+        {/* View Mode Toggle pills */}
+        <div className="flex bg-[#0c1220]/60 p-1 rounded-xl border border-white/5 select-none shrink-0 self-end sm:self-auto">
           <button
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border ${
-              showAdvancedFilters
-                ? 'bg-blue-600/10 border-blue-500 text-blue-400'
-                : 'bg-slate-900/60 border-white/5 text-slate-300 hover:text-white'
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'table' ? 'bg-slate-800 text-white' : 'text-slate-400'
             }`}
+            title="Table View"
           >
-            <Filter className="h-4 w-4" />
-            Filters
+            <Table className="h-4 w-4" />
           </button>
-
-          {/* View Mode Toggle pills */}
-          <div className="flex bg-[#0c1220]/60 p-1 rounded-xl border border-white/5 select-none shrink-0">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'table' ? 'bg-slate-800 text-white' : 'text-slate-400'
-              }`}
-              title="Table View"
-            >
-              <Table className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('board')}
-              className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'board' ? 'bg-slate-800 text-white' : 'text-slate-400'
-              }`}
-              title="Board View"
-            >
-              <Grid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'list' ? 'bg-slate-800 text-white' : 'text-slate-400'
-              }`}
-              title="List View"
-            >
-              <ListIcon className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            onClick={() => setViewMode('board')}
+            className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'board' ? 'bg-slate-800 text-white' : 'text-slate-400'
+            }`}
+            title="Board View"
+          >
+            <Grid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'list' ? 'bg-slate-800 text-white' : 'text-slate-400'
+            }`}
+            title="List View"
+          >
+            <ListIcon className="h-4 w-4" />
+          </button>
         </div>
       </div>
-
-      {/* Advanced Filters expansion panel */}
-      {showAdvancedFilters && (
-        <div className="bg-[#0c1220]/60 border border-white/5 rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-4 gap-4 animate-fade shadow">
-          <div>
-            <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1.5 block">Product Filter</label>
-            <select
-              value={advancedFilters.productType}
-              onChange={(e) => setAdvancedFilters({ ...advancedFilters, productType: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/5 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
-            >
-              <option value="">All Products</option>
-              {productsCatalog.map((prod, idx) => (
-                <option key={idx} value={prod.name || prod.label || prod}>{prod.name || prod.label || prod}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1.5 block">Lead Source</label>
-            <select
-              value={advancedFilters.leadSource}
-              onChange={(e) => setAdvancedFilters({ ...advancedFilters, leadSource: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/5 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
-            >
-              <option value="">All Sources</option>
-              {['PARTNER_REFERAL', 'DIRECT', 'INBOUND_WEBSITE', 'EVENT_TRADESHOW', 'COLD_OUTREACH', 'LINKEDIN', 'EXISTING_CUSTOMER', 'OTHER'].map((src) => (
-                <option key={src} value={src}>{src.replace('_', ' ')}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1.5 block">Sort Field</label>
-            <select
-              value={advancedFilters.sortField}
-              onChange={(e) => setAdvancedFilters({ ...advancedFilters, sortField: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/5 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
-            >
-              <option value="updatedAt">Follow Up Date</option>
-              <option value="companyName">Company Name</option>
-              <option value="dealValue">Deal Value</option>
-              <option value="expectedCloseDate">Expected Close Date</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1.5 block">Direction</label>
-            <select
-              value={advancedFilters.sortDirection}
-              onChange={(e) => setAdvancedFilters({ ...advancedFilters, sortDirection: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/5 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </div>
-        </div>
-      )}
 
       {/* STAGE PILLS SELECTOR */}
       <div className="flex overflow-x-auto gap-2 py-2 hide-scrollbar scroll-smooth">
