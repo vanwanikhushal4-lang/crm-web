@@ -18,7 +18,8 @@ import {
   Mail,
   MapPin,
   Tag,
-  Table
+  Table,
+  Calendar
 } from 'lucide-react';
 
 
@@ -37,23 +38,97 @@ import RunningNumber from '../common/RunningNumber';
 
 export const parseBudgetToCr = (value) => {
   if (value == null || value === '') return 0;
-  if (typeof value === 'number') return value;
-  const str = String(value).toLowerCase().replace(/,/g, '');
+  const str = String(value).trim().toLowerCase().replace(/,/g, '');
+  if (!str) return 0;
+
+  if (str.includes('cr')) {
+    const numbers = str.match(/\d+(\.\d+)?/g)?.map(Number) || [];
+    if (!numbers.length) return 0;
+    return numbers.length > 1 ? (numbers[0] + numbers[1]) / 2 : numbers[0];
+  }
+
+  if (str.includes('lakh') || str.includes('lac') || str.includes('l')) {
+    const numbers = str.match(/\d+(\.\d+)?/g)?.map(Number) || [];
+    if (!numbers.length) return 0;
+    const avg = numbers.length > 1 ? (numbers[0] + numbers[1]) / 2 : numbers[0];
+    return avg / 100;
+  }
+
   const numbers = str.match(/\d+(\.\d+)?/g)?.map(Number) || [];
   if (!numbers.length) return 0;
   const avg = numbers.length > 1 ? (numbers[0] + numbers[1]) / 2 : numbers[0];
-  if (str.includes('cr')) return avg;
-  if (str.includes('lakh') || str.includes('lac') || str.includes(' l')) return avg / 100;
-  if (avg >= 100000) return avg / 10000000;
+
+  // Convert raw number (Rupees) to Crores (1 Cr = 1,00,00,000 Rupees)
+  if (avg >= 10000) {
+    return avg / 10000000;
+  }
+
   return avg;
 };
 
-export const formatCr = (value, emptyLabel = 'TBD') => {
+export const formatCr = (value, emptyLabel = '₹0') => {
   const number = Number(value || 0);
-  if (!number) return emptyLabel;
-  if (number >= 1) return `₹${number.toFixed(number >= 10 ? 0 : 1)} Cr`;
-  if (number >= 0.01) return `₹${Math.round(number * 100)} L`;
-  return `₹${Math.round(number * 10000000).toLocaleString('en-IN')}`;
+  if (!number || isNaN(number)) return emptyLabel;
+
+  if (number >= 1) {
+    const formatted = number % 1 === 0 ? number.toFixed(0) : number.toFixed(2).replace(/\.?0+$/, '');
+    return `₹${formatted} Cr`;
+  }
+
+  if (number >= 0.01) {
+    const lakhs = number * 100;
+    const formatted = lakhs % 1 === 0 ? lakhs.toFixed(0) : lakhs.toFixed(2).replace(/\.?0+$/, '');
+    return `₹${formatted} L`;
+  }
+
+  const rupees = Math.round(number * 10000000);
+  return `₹${rupees.toLocaleString('en-IN')}`;
+};
+
+export const isDateInRange = (dateStr, rangeKey) => {
+  if (!rangeKey || rangeKey === 'ALL') return true;
+  if (!dateStr) return false;
+
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return false;
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (rangeKey === 'TODAY') {
+    return d >= startOfDay && d < new Date(startOfDay.getTime() + 86400000);
+  }
+
+  if (rangeKey === 'THIS_WEEK') {
+    const dayOfWeek = startOfDay.getDay();
+    const startOfWeek = new Date(startOfDay);
+    startOfWeek.setDate(startOfDay.getDate() - dayOfWeek);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+    return d >= startOfWeek && d < endOfWeek;
+  }
+
+  if (rangeKey === 'THIS_MONTH') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return d >= startOfMonth && d < endOfMonth;
+  }
+
+  if (rangeKey === 'THIS_QUARTER') {
+    const currentMonth = now.getMonth();
+    const qStartMonth = Math.floor(currentMonth / 3) * 3;
+    const startOfQuarter = new Date(now.getFullYear(), qStartMonth, 1);
+    const endOfQuarter = new Date(now.getFullYear(), qStartMonth + 3, 1);
+    return d >= startOfQuarter && d < endOfQuarter;
+  }
+
+  if (rangeKey === 'THIS_YEAR') {
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const endOfYear = new Date(now.getFullYear() + 1, 0, 1);
+    return d >= startOfYear && d < endOfYear;
+  }
+
+  return true;
 };
 
 export const getStageFromMom = (mom) => {
@@ -122,6 +197,7 @@ export default function PipelineTab() {
   // Filter and search states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState('All stages');
+  const [dateFilterRange, setDateFilterRange] = useState('ALL');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState({
     productType: '',
@@ -807,10 +883,16 @@ export default function PipelineTab() {
     return false;
   };
 
-  // Filter & search pipeline list
-  const filteredRows = unifiedLeads
+  // 1. Apply Date Filter to dataset first
+  const dateFilteredRows = unifiedLeads.filter((row) => {
+    const targetDate = row.expectedCloseDate || row.followUpDate || row.updatedAt;
+    return isDateInRange(targetDate, dateFilterRange);
+  });
+
+  // 2. Filter & search pipeline list (combines date filter with search query and stage pills)
+  const filteredRows = dateFilteredRows
     .filter((row) => {
-      // 1. Filter by search query
+      // Filter by search query
       const query = searchQuery.toLowerCase();
       const matchQuery =
         searchQuery === '' ||
@@ -821,59 +903,32 @@ export default function PipelineTab() {
         row.leadSource.toLowerCase().includes(query) ||
         row.notes.toLowerCase().includes(query);
 
-      // 2. Filter by selected stage pill
+      // Filter by selected stage pill
       const matchStage = matchesPillStage(row.stage, selectedStage);
 
-      // 3. Filter by Segment selection:
-      // Meeting Pipeline typically tracks active/discussion pipelines, while Leads tracks raw/unassigned prospects.
-      // We can classify deals with values as active pipeline meetings, and unvalued/new leads as Leads.
-      const isLeadOnly = row.dealValueNumeric === 0;
-      const matchSegment = pipelineType === 'meeting' ? !isLeadOnly : isLeadOnly;
-
-      // 4. Advanced Filters
-      const matchAdvancedProduct =
-        advancedFilters.productType === '' ||
-        row.product.toLowerCase().includes(advancedFilters.productType.toLowerCase());
-
-      const matchAdvancedSource =
-        advancedFilters.leadSource === '' ||
-        row.leadSource.toLowerCase() === advancedFilters.leadSource.toLowerCase();
-
-      return matchQuery && matchStage && matchAdvancedProduct && matchAdvancedSource;
+      return matchQuery && matchStage;
     })
     .sort((a, b) => {
-      // Sort logic
-      const field = advancedFilters.sortField;
-      const direction = advancedFilters.sortDirection === 'asc' ? 1 : -1;
-
-      if (field === 'companyName') {
-        return a.company.localeCompare(b.company) * direction;
-      }
-      if (field === 'dealValue') {
-        return (a.dealValueNumeric - b.dealValueNumeric) * direction;
-      }
-      if (field === 'expectedCloseDate') {
-        return (new Date(a.expectedCloseDate || 0) - new Date(b.expectedCloseDate || 0)) * direction;
-      }
-      // Fallback updatedAt / follow-up date
-      return (new Date(a.followUpDate || 0) - new Date(b.followUpDate || 0)) * direction;
+      return (new Date(b.followUpDate || b.updatedAt || 0) - new Date(a.followUpDate || a.updatedAt || 0));
     });
 
-  // Calculate Metrics
+  // 3. Calculate Metrics strictly on date-filtered dataset pool
   const calculateMetrics = () => {
-    // 1. Active Pipeline: total value of ongoing/active deals (excludes won/lost status)
-    const activeDeals = unifiedLeads.filter((d) => !['WON', 'LOST'].includes(d.stage));
-    const activePipelineVal = activeDeals.reduce((sum, d) => sum + d.dealValueNumeric, 0);
+    const pool = dateFilteredRows;
 
-    // 2. Total Opportunities
-    const totalOpportunities = unifiedLeads.length;
+    // Active Pipeline: total value of open deals (Stages 1-5, excluding WON & LOST)
+    const activeDeals = pool.filter((d) => !['WON', 'LOST'].includes(d.stage));
+    const activePipelineVal = activeDeals.reduce((sum, d) => sum + (d.dealValueNumeric || 0), 0);
 
-    // 3. Revenue Won: Total budget value of deals in Won stage
-    const wonDeals = unifiedLeads.filter((d) => d.stage === 'WON');
-    const revenueWon = wonDeals.reduce((sum, d) => sum + d.dealValueNumeric, 0);
+    // Total Opportunities in date range
+    const totalOpportunities = pool.length;
 
-    // 4. Win Rate: Percentage of won deals relative to all closed deals: won / (won + lost)
-    const lostCount = unifiedLeads.filter((d) => d.stage === 'LOST').length;
+    // Revenue Won: Total budget value of deals in Won stage only
+    const wonDeals = pool.filter((d) => d.stage === 'WON');
+    const revenueWon = wonDeals.reduce((sum, d) => sum + (d.dealValueNumeric || 0), 0);
+
+    // Win Rate: Percentage of won deals relative to all closed deals: won / (won + lost)
+    const lostCount = pool.filter((d) => d.stage === 'LOST').length;
     const wonCount = wonDeals.length;
     const closedCount = wonCount + lostCount;
     const winRate = closedCount > 0 ? Math.round((wonCount / closedCount) * 100) : 0;
@@ -888,17 +943,17 @@ export default function PipelineTab() {
 
   const metrics = calculateMetrics();
 
-  // Get distribution counts for progress bar segment
+  // Get distribution counts for progress bar segment based on date-filtered dataset
   const getStageCounts = () => {
     const counts = {};
-    unifiedLeads.forEach((d) => {
+    dateFilteredRows.forEach((d) => {
       const stageName = d.stage.replace('_', ' ');
       counts[stageName] = (counts[stageName] || 0) + 1;
     });
     return Object.entries(counts).map(([stage, count]) => ({
       stage,
       count,
-      percent: unifiedLeads.length > 0 ? (count / unifiedLeads.length) * 100 : 0
+      percent: dateFilteredRows.length > 0 ? (count / dateFilteredRows.length) * 100 : 0
     }));
   };
 
@@ -933,7 +988,24 @@ export default function PipelineTab() {
         </div>
 
         {/* Header Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date Filter Dropdown */}
+          <div className="flex items-center gap-2 bg-slate-900/60 border border-white/5 px-3 py-2 rounded-xl text-xs shrink-0">
+            <Calendar className="h-4 w-4 text-blue-400" />
+            <select
+              value={dateFilterRange}
+              onChange={(e) => setDateFilterRange(e.target.value)}
+              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Time</option>
+              <option value="TODAY" className="bg-slate-900 text-slate-200">Today</option>
+              <option value="THIS_WEEK" className="bg-slate-900 text-slate-200">This Week</option>
+              <option value="THIS_MONTH" className="bg-slate-900 text-slate-200">This Month</option>
+              <option value="THIS_QUARTER" className="bg-slate-900 text-slate-200">This Quarter</option>
+              <option value="THIS_YEAR" className="bg-slate-900 text-slate-200">This Year</option>
+            </select>
+          </div>
+
           <button
             onClick={handleExportCSV}
             className="px-4 py-2 bg-slate-900/60 border border-white/5 hover:border-blue-500/20 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow"
@@ -1073,41 +1145,12 @@ export default function PipelineTab() {
           <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/60 border border-white/5 shrink-0 select-none">
             <span className="text-xs font-semibold text-slate-400">Total Leads:</span>
             <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
-              {unifiedLeads.length}
+              {filteredRows.length}
             </span>
           </div>
         </div>
 
-        {/* View Mode Toggle pills */}
-        <div className="flex bg-[#0c1220]/60 p-1 rounded-xl border border-white/5 select-none shrink-0 self-end sm:self-auto">
-          <button
-            onClick={() => setViewMode('table')}
-            className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-              viewMode === 'table' ? 'bg-slate-800 text-white' : 'text-slate-400'
-            }`}
-            title="Table View"
-          >
-            <Table className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('board')}
-            className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-              viewMode === 'board' ? 'bg-slate-800 text-white' : 'text-slate-400'
-            }`}
-            title="Board View"
-          >
-            <Grid className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-              viewMode === 'list' ? 'bg-slate-800 text-white' : 'text-slate-400'
-            }`}
-            title="List View"
-          >
-            <ListIcon className="h-4 w-4" />
-          </button>
-        </div>
+
       </div>
 
       {/* STAGE PILLS SELECTOR */}
@@ -1635,9 +1678,9 @@ export default function PipelineTab() {
                     onChange={(e) => setLeadForm({ ...leadForm, priority: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
                   >
-                    <option value="COLD">Low</option>
-                    <option value="WARM">Medium</option>
-                    <option value="HOT">High</option>
+                    <option value="Cold">Cold</option>
+                    <option value="Warm">Warm</option>
+                    <option value="Hot">Hot</option>
                   </select>
                 </div>
               </div>
