@@ -197,6 +197,7 @@ export default function PipelineTab() {
   // Filter and search states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState('All stages');
+  const [selectedPriority, setSelectedPriority] = useState('ALL');
   const [dateFilterRange, setDateFilterRange] = useState('ALL');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState({
@@ -883,13 +884,29 @@ export default function PipelineTab() {
     return false;
   };
 
+  // Map priority selector to lead priority matching
+  const matchesPriority = (itemPriority, filterPriority) => {
+    if (!filterPriority || filterPriority === 'ALL') return true;
+    const prio = (itemPriority || '').toUpperCase();
+    if (filterPriority === 'HOT') {
+      return prio === 'HOT' || prio === 'HIGH';
+    }
+    if (filterPriority === 'WARM') {
+      return prio === 'WARM' || prio === 'MEDIUM';
+    }
+    if (filterPriority === 'COLD') {
+      return prio === 'COLD' || prio === 'LOW';
+    }
+    return true;
+  };
+
   // 1. Apply Date Filter to dataset first
   const dateFilteredRows = unifiedLeads.filter((row) => {
     const targetDate = row.expectedCloseDate || row.followUpDate || row.updatedAt;
     return isDateInRange(targetDate, dateFilterRange);
   });
 
-  // 2. Filter & search pipeline list (combines date filter with search query and stage pills)
+  // 2. Filter & search pipeline list (combines date filter with search query, stage, and priority)
   const filteredRows = dateFilteredRows
     .filter((row) => {
       // Filter by search query
@@ -903,10 +920,13 @@ export default function PipelineTab() {
         row.leadSource.toLowerCase().includes(query) ||
         row.notes.toLowerCase().includes(query);
 
-      // Filter by selected stage pill
+      // Filter by selected stage pill / dropdown
       const matchStage = matchesPillStage(row.stage, selectedStage);
 
-      return matchQuery && matchStage;
+      // Filter by selected priority dropdown
+      const matchPriority = matchesPriority(row.priority, selectedPriority);
+
+      return matchQuery && matchStage && matchPriority;
     })
     .sort((a, b) => {
       return (new Date(b.followUpDate || b.updatedAt || 0) - new Date(a.followUpDate || a.updatedAt || 0));
@@ -1125,8 +1145,8 @@ export default function PipelineTab() {
         </div>
       </div>
 
-      {/* CONTROLS: SEARCH & COUNT BAR */}
-      <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between border-b border-white/5 pb-4">
+      {/* CONTROLS: SEARCH, COUNT & FILTERS BAR */}
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between border-b border-white/5 pb-4">
         
         <div className="flex items-center gap-3 flex-1 max-w-xl">
           {/* Text query input */}
@@ -1150,6 +1170,41 @@ export default function PipelineTab() {
           </div>
         </div>
 
+        {/* Stage & Priority Dropdown Filters */}
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* Stage Filter */}
+          <div className="flex items-center gap-2 bg-slate-900/60 border border-white/5 px-3.5 py-2 rounded-xl text-xs">
+            <Filter className="h-3.5 w-3.5 text-blue-400" />
+            <span className="text-slate-400 font-medium">Stage:</span>
+            <select
+              value={selectedStage}
+              onChange={(e) => setSelectedStage(e.target.value)}
+              className="bg-transparent text-slate-100 text-xs font-semibold focus:outline-none cursor-pointer pr-1"
+            >
+              {STAGES_PILLS.map((stg) => (
+                <option key={stg} value={stg} className="bg-slate-900 text-slate-200">
+                  {stg}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Priority Filter */}
+          <div className="flex items-center gap-2 bg-slate-900/60 border border-white/5 px-3.5 py-2 rounded-xl text-xs">
+            <Filter className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-slate-400 font-medium">Priority:</span>
+            <select
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value)}
+              className="bg-transparent text-slate-100 text-xs font-semibold focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Priorities</option>
+              <option value="HOT" className="bg-slate-900 text-slate-200">Hot / High</option>
+              <option value="WARM" className="bg-slate-900 text-slate-200">Warm / Medium</option>
+              <option value="COLD" className="bg-slate-900 text-slate-200">Cold</option>
+            </select>
+          </div>
+        </div>
 
       </div>
 
