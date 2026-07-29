@@ -15,7 +15,9 @@ import {
   Clock,
   Sparkles,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { getAllLeads, getAllUsers } from '../../api/apiFunctions/Login/Login_api_function';
 import RunningNumber from '../../components/common/RunningNumber';
@@ -68,7 +70,21 @@ export const formatValue = (val) => {
   return `₹${num.toLocaleString('en-IN')}`;
 };
 
-// Check priorities
+// Check priorities and status
+export const isWonLead = (lead) => {
+  const stage = String(lead?.stage || lead?.leadStage || lead?.status || lead?.lead_stage || lead?.priority || '').trim().toUpperCase();
+  const nextStep = String(lead?.outcome?.next_step || lead?.next_step || '').toLowerCase();
+  const numericStage = Number(lead?.stage || lead?.stageId || lead?.leadStageId);
+  return stage === 'WON' || stage === 'CLOSED_WON' || numericStage === 6 || nextStep.includes('won') || nextStep.includes('closed') || nextStep.includes('closure');
+};
+
+export const isLostLead = (lead) => {
+  const stage = String(lead?.stage || lead?.leadStage || lead?.status || lead?.lead_stage || lead?.priority || '').trim().toUpperCase();
+  const nextStep = String(lead?.outcome?.next_step || lead?.next_step || '').toLowerCase();
+  const numericStage = Number(lead?.stage || lead?.stageId || lead?.leadStageId);
+  return stage === 'LOST' || stage === 'CLOSED_LOST' || numericStage === 7 || nextStep.includes('lost') || nextStep.includes('reject') || nextStep.includes('not interested');
+};
+
 export const isHotLead = (lead) => {
   const p = String(lead?.priority || lead?.leadType || lead?.lead_type || '').trim().toUpperCase();
   return p === 'HOT' || p === 'HIGH';
@@ -220,13 +236,28 @@ export default function ChiefAdminLeadsDashboard() {
     return allLeads
       .map(lead => {
         const ownerId = String(lead.assignedTo || lead.userId || lead.user_id || '');
+        const won = isWonLead(lead);
+        const lost = isLostLead(lead);
+        const hot = isHotLead(lead);
+        const warm = isWarmLead(lead);
+
+        let priority = 'Other';
+        if (won) priority = 'Won';
+        else if (lost) priority = 'Lost';
+        else if (hot) priority = 'Hot';
+        else if (warm) priority = 'Warm';
+
         return {
           ...lead,
           ownerId,
           owner: userNameMap[ownerId] || lead.ownerName || lead.owner || 'Unassigned',
           company: lead.companyName || lead.company || lead.customerName || 'Unnamed Company',
           value: parseDealValue(lead.dealValue || lead.value || lead.budget),
-          priority: isHotLead(lead) ? 'Hot' : (isWarmLead(lead) ? 'Warm' : 'Other'),
+          priority,
+          isWon: won,
+          isLost: lost,
+          isHot: hot,
+          isWarm: warm,
           date: lead.expectedCloseDate || lead.expected_close_date || lead.createdAt || '',
         };
       })
@@ -240,21 +271,29 @@ export default function ChiefAdminLeadsDashboard() {
   }, [allLeads, userNameMap, selectedDate]);
 
   // Subset filters
-  const hotLeads = useMemo(() => mappedLeads.filter(l => l.priority === 'Hot'), [mappedLeads]);
-  const warmLeads = useMemo(() => mappedLeads.filter(l => l.priority === 'Warm'), [mappedLeads]);
+  const hotLeads = useMemo(() => mappedLeads.filter(l => l.isHot && !l.isWon && !l.isLost), [mappedLeads]);
+  const warmLeads = useMemo(() => mappedLeads.filter(l => l.isWarm && !l.isWon && !l.isLost), [mappedLeads]);
+  const wonLeads = useMemo(() => mappedLeads.filter(l => l.isWon), [mappedLeads]);
+  const lostLeads = useMemo(() => mappedLeads.filter(l => l.isLost), [mappedLeads]);
 
   // 3. Top-Level Summary Metrics (Global values for the selected month)
   const summary = useMemo(() => {
     const grandTotal = mappedLeads.reduce((sum, l) => sum + l.value, 0);
     const hotTotal = hotLeads.reduce((sum, l) => sum + l.value, 0);
     const warmTotal = warmLeads.reduce((sum, l) => sum + l.value, 0);
+    const wonTotal = wonLeads.reduce((sum, l) => sum + l.value, 0);
+    const lostTotal = lostLeads.reduce((sum, l) => sum + l.value, 0);
     return {
       grandTotal,
       hotTotal,
       warmTotal,
-      count: mappedLeads.length
+      wonTotal,
+      lostTotal,
+      count: mappedLeads.length,
+      wonCount: wonLeads.length,
+      lostCount: lostLeads.length
     };
-  }, [mappedLeads, hotLeads, warmLeads]);
+  }, [mappedLeads, hotLeads, warmLeads, wonLeads, lostLeads]);
 
   // 4. Extract unique sales representatives for select buttons/dropdown
   const SALES_REPS = useMemo(() => {
@@ -274,6 +313,10 @@ export default function ChiefAdminLeadsDashboard() {
           hotValue: 0, 
           warmDeals: 0, 
           warmValue: 0, 
+          wonDeals: 0,
+          wonValue: 0,
+          lostDeals: 0,
+          lostValue: 0,
           totalDeals: 0, 
           totalValue: 0, 
           largestCompany: '', 
@@ -286,10 +329,16 @@ export default function ChiefAdminLeadsDashboard() {
       entry.totalDeals += 1;
       entry.totalValue += lead.value;
       
-      if (lead.priority === 'Hot') {
+      if (lead.isWon) {
+        entry.wonDeals += 1;
+        entry.wonValue += lead.value;
+      } else if (lead.isLost) {
+        entry.lostDeals += 1;
+        entry.lostValue += lead.value;
+      } else if (lead.isHot) {
         entry.hotDeals += 1;
         entry.hotValue += lead.value;
-      } else if (lead.priority === 'Warm') {
+      } else if (lead.isWarm) {
         entry.warmDeals += 1;
         entry.warmValue += lead.value;
       }
@@ -310,6 +359,10 @@ export default function ChiefAdminLeadsDashboard() {
       hotValue: d.hotValue,
       warmDeals: d.warmDeals,
       warmValue: d.warmValue,
+      wonDeals: d.wonDeals,
+      wonValue: d.wonValue,
+      lostDeals: d.lostDeals,
+      lostValue: d.lostValue,
       largestCompany: d.largestCompany,
       largestValue: d.largestValue,
       largestOpportunity: d.largestOpportunity
@@ -329,13 +382,17 @@ export default function ChiefAdminLeadsDashboard() {
         hotValue: summary.hotTotal,
         warmDeals: warmLeads.length,
         warmValue: summary.warmTotal,
+        wonDeals: wonLeads.length,
+        wonValue: summary.wonTotal,
+        lostDeals: lostLeads.length,
+        lostValue: summary.lostTotal,
         largestCompany: bestDeal.largestCompany || '',
         largestValue: bestDeal.largestValue || 0,
         largestOpportunity: bestDeal.largestOpportunity || null
       };
     }
     return ownershipSummary.find(x => x.owner.toLowerCase() === selectedRep.toLowerCase()) || null;
-  }, [selectedRep, ownershipSummary, mappedLeads, summary, hotLeads, warmLeads]);
+  }, [selectedRep, ownershipSummary, mappedLeads, summary, hotLeads, warmLeads, wonLeads, lostLeads]);
 
   // Leads filtered for dashboard graphs based on representative selection
   const filteredLeadsForCharts = useMemo(() => {
@@ -721,11 +778,13 @@ export default function ChiefAdminLeadsDashboard() {
     }));
   };
 
-  // Filtered lists for Hot / Warm Leads tabs
+  // Filtered lists for Hot / Warm / Won / Lost Leads tabs
   const getFilteredList = (temperature) => {
     let filtered = mappedLeads.filter(lead => {
-      if (temperature === 'HOT') return lead.priority === 'Hot';
-      if (temperature === 'WARM') return lead.priority === 'Warm';
+      if (temperature === 'HOT') return lead.isHot && !lead.isWon && !lead.isLost;
+      if (temperature === 'WARM') return lead.isWarm && !lead.isWon && !lead.isLost;
+      if (temperature === 'WON') return lead.isWon;
+      if (temperature === 'LOST') return lead.isLost;
       return false;
     });
 
@@ -759,6 +818,8 @@ export default function ChiefAdminLeadsDashboard() {
 
   const filteredHotLeads = getFilteredList('HOT');
   const filteredWarmLeads = getFilteredList('WARM');
+  const filteredWonLeads = getFilteredList('WON');
+  const filteredLostLeads = getFilteredList('LOST');
 
   return (
     <div className="animate-fade flex flex-col gap-6" style={{ width: '100%' }}>
@@ -915,7 +976,7 @@ export default function ChiefAdminLeadsDashboard() {
 
           {/* Tab Menu Header */}
           <div className="flex gap-6 mb-2 border-b border-white/10 pb-px" style={{ position: 'relative' }}>
-            {['DASHBOARD', 'HOT', 'WARM'].map((tab) => (
+            {['DASHBOARD', 'HOT', 'WARM', 'WON', 'LOST'].map((tab) => (
               <button
                 key={tab}
                 className="pb-3 font-semibold text-[15px] transition-all relative"
@@ -923,7 +984,9 @@ export default function ChiefAdminLeadsDashboard() {
                   background: 'none', 
                   border: 'none', 
                   cursor: 'pointer',
-                  color: activeTab === tab ? '#60a5fa' : '#94a3b8',
+                  color: activeTab === tab ? (
+                    tab === 'WON' ? '#10b981' : tab === 'LOST' ? '#ef4444' : '#60a5fa'
+                  ) : '#94a3b8',
                   paddingLeft: 0,
                   paddingRight: 0
                 }}
@@ -933,10 +996,18 @@ export default function ChiefAdminLeadsDashboard() {
                   {tab === 'DASHBOARD' && <TrendingUp size={16} />}
                   {tab === 'HOT' && <Flame size={16} />}
                   {tab === 'WARM' && <Sun size={16} />}
-                  {tab === 'DASHBOARD' ? 'Dashboard Summary' : (tab === 'HOT' ? 'Hot Leads' : 'Warm Leads')}
+                  {tab === 'WON' && <CheckCircle2 size={16} color="#10b981" />}
+                  {tab === 'LOST' && <XCircle size={16} color="#ef4444" />}
+                  {tab === 'DASHBOARD' ? 'Dashboard Summary' : (tab === 'HOT' ? 'Hot Leads' : (tab === 'WARM' ? 'Warm Leads' : (tab === 'WON' ? 'Won Leads' : 'Lost Leads')))}
                 </span>
                 {activeTab === tab && (
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                  <div 
+                    className="absolute bottom-0 left-0 right-0 h-[2px]" 
+                    style={{
+                      backgroundColor: tab === 'WON' ? '#10b981' : tab === 'LOST' ? '#ef4444' : '#3b82f6',
+                      boxShadow: `0 0 8px ${tab === 'WON' ? 'rgba(16,185,129,0.8)' : tab === 'LOST' ? 'rgba(239,68,68,0.8)' : 'rgba(59,130,246,0.8)'}`
+                    }}
+                  />
                 )}
               </button>
             ))}
@@ -1235,7 +1306,7 @@ export default function ChiefAdminLeadsDashboard() {
             </div>
           )}
 
-          {(activeTab === 'HOT' || activeTab === 'WARM') && (
+          {(activeTab === 'HOT' || activeTab === 'WARM' || activeTab === 'WON' || activeTab === 'LOST') && (
             <div className="flex flex-col gap-6">
               
               {/* Search & Chip Sub-Filter */}
@@ -1321,7 +1392,12 @@ export default function ChiefAdminLeadsDashboard() {
 
               {/* Leads flat list */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(activeTab === 'HOT' ? filteredHotLeads : filteredWarmLeads).length === 0 ? (
+                {(
+                  activeTab === 'HOT' ? filteredHotLeads :
+                  activeTab === 'WARM' ? filteredWarmLeads :
+                  activeTab === 'WON' ? filteredWonLeads :
+                  filteredLostLeads
+                ).length === 0 ? (
                   <div className="glass-panel col-span-2 flex-col items-center justify-center text-center py-16" style={{ padding: '24px' }}>
                     <AlertCircle size={40} className="text-muted" style={{ opacity: 0.4, marginBottom: '12px' }} />
                     <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>No matching leads found</h4>
@@ -1330,9 +1406,16 @@ export default function ChiefAdminLeadsDashboard() {
                     </p>
                   </div>
                 ) : (
-                  (activeTab === 'HOT' ? filteredHotLeads : filteredWarmLeads).map((lead, idx) => {
+                  (
+                    activeTab === 'HOT' ? filteredHotLeads :
+                    activeTab === 'WARM' ? filteredWarmLeads :
+                    activeTab === 'WON' ? filteredWonLeads :
+                    filteredLostLeads
+                  ).map((lead, idx) => {
                     const leadId = lead.id || `lead-${idx}`;
                     const isExpanded = !!expandedLeads[leadId];
+                    const themeColor = activeTab === 'HOT' ? '#f43f5e' : (activeTab === 'WARM' ? '#fbbf24' : (activeTab === 'WON' ? '#10b981' : '#ef4444'));
+                    const themeRgb = activeTab === 'HOT' ? '244, 63, 94' : (activeTab === 'WARM' ? '245, 158, 11' : (activeTab === 'WON' ? '16, 185, 129' : '239, 68, 68'));
 
                     return (
                       <div 
@@ -1340,10 +1423,10 @@ export default function ChiefAdminLeadsDashboard() {
                         className="glass-panel flex-col transition-all duration-300"
                         style={{
                           padding: '20px',
-                          borderLeft: `4px solid ${activeTab === 'HOT' ? '#f43f5e' : '#fbbf24'}`,
+                          borderLeft: `4px solid ${themeColor}`,
                           background: 'rgba(30, 41, 59, 0.4)',
-                          borderColor: isExpanded ? (activeTab === 'HOT' ? 'rgba(244, 63, 94, 0.6)' : 'rgba(245, 158, 11, 0.6)') : 'rgba(255, 255, 255, 0.08)',
-                          boxShadow: isExpanded ? `0 8px 30px rgba(${activeTab === 'HOT' ? '244, 63, 94' : '245, 158, 11'}, 0.08)` : 'none'
+                          borderColor: isExpanded ? `rgba(${themeRgb}, 0.6)` : 'rgba(255, 255, 255, 0.08)',
+                          boxShadow: isExpanded ? `0 8px 30px rgba(${themeRgb}, 0.08)` : 'none'
                         }}
                       >
                         {/* Lead Card Header */}
@@ -1359,12 +1442,15 @@ export default function ChiefAdminLeadsDashboard() {
                                 fontSize: '11px',
                                 fontWeight: '700',
                                 marginBottom: '8px',
-                                background: activeTab === 'HOT' ? 'rgba(244, 63, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                color: activeTab === 'HOT' ? '#f43f5e' : '#fbbf24'
+                                background: `rgba(${themeRgb}, 0.15)`,
+                                color: themeColor
                               }}
                             >
-                              {activeTab === 'HOT' ? <Flame size={10} /> : <Sun size={10} />}
-                              {activeTab === 'HOT' ? 'HOT DEALT' : 'WARM DEALT'}
+                              {activeTab === 'HOT' && <Flame size={10} />}
+                              {activeTab === 'WARM' && <Sun size={10} />}
+                              {activeTab === 'WON' && <CheckCircle2 size={10} />}
+                              {activeTab === 'LOST' && <XCircle size={10} />}
+                              {activeTab === 'HOT' ? 'HOT DEAL' : (activeTab === 'WARM' ? 'WARM DEAL' : (activeTab === 'WON' ? 'WON DEAL' : 'LOST DEAL'))}
                             </span>
                             <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#fff' }}>{lead.company || 'Unknown Company'}</h3>
                           </div>
