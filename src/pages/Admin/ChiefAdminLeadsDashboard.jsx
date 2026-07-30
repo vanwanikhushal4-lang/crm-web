@@ -19,7 +19,7 @@ import {
   CheckCircle2,
   XCircle
 } from 'lucide-react';
-import { getAllLeads, getAllUsers } from '../../api/apiFunctions/Login/Login_api_function';
+import { getAllLeads, getAllUsers, getActiveOutsiders } from '../../api/apiFunctions/Login/Login_api_function';
 import RunningNumber from '../../components/common/RunningNumber';
 
 // Safe list extraction helper to match nested database schemas
@@ -119,6 +119,7 @@ export default function ChiefAdminLeadsDashboard() {
   // Data State
   const [allLeads, setAllLeads] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [activeOutsiders, setActiveOutsiders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -130,7 +131,7 @@ export default function ChiefAdminLeadsDashboard() {
     setIsLoading(true);
     setError(null);
     try {
-      const [leadsRes, usersRes] = await Promise.all([
+      const [leadsRes, usersRes, outsidersRes] = await Promise.all([
         getAllLeads().catch((err) => {
           console.error("Failed to load leads:", err);
           return [];
@@ -138,19 +139,25 @@ export default function ChiefAdminLeadsDashboard() {
         getAllUsers().catch((err) => {
           console.error("Failed to load users:", err);
           return [];
+        }),
+        getActiveOutsiders().catch((err) => {
+          console.warn("Failed to load active outsiders:", err);
+          return [];
         })
       ]);
 
       const rawLeads = extractList(leadsRes);
       const rawUsers = extractList(usersRes);
+      const rawOutsiders = extractList(outsidersRes);
 
       // User ID Filtering: Filters out userId === '2' (system/test user)
-      const cleanUsers = rawUsers.filter(user => {
-        const uId = String(user.id || user.userId);
+      const cleanUsers = (Array.isArray(rawUsers) ? rawUsers : []).filter(user => {
+        if (!user || typeof user !== 'object') return false;
+        const uId = String(user.id || user.userId || user.user_id || '');
         if (uId === '2') {
-          const username = (user.username || '').toLowerCase();
-          const email = (user.email || '').toLowerCase();
-          const firstName = (user.firstName || user.firstname || '').toLowerCase();
+          const username = String(user.username || '').toLowerCase();
+          const email = String(user.email || '').toLowerCase();
+          const firstName = String(user.firstName || user.firstname || user.first_name || '').toLowerCase();
           if (username.includes('test') || username.includes('system') || 
               email.includes('test') || email.includes('system') ||
               firstName.includes('test') || firstName.includes('system')) {
@@ -160,19 +167,22 @@ export default function ChiefAdminLeadsDashboard() {
         return true;
       });
 
-      const cleanLeads = rawLeads
+      const cleanLeads = (Array.isArray(rawLeads) ? rawLeads : [])
+        .filter(lead => lead && typeof lead === 'object')
         .map(lead => ({
           ...lead,
-          userId: lead.userId || lead.createdBy
+          userId: lead.userId || lead.createdBy || lead.user_id || ''
         }))
         .filter(lead => {
-          const uId = String(lead.userId);
-          // Only filter out lead if its owner was filtered out of cleanUsers
-          return cleanUsers.some(u => String(u.id || u.userId) === uId);
+          const uId = String(lead.userId || '');
+          if (!uId) return true;
+          if (cleanUsers.length === 0) return true;
+          return cleanUsers.some(u => u && String(u.id || u.userId || u.user_id || '') === uId);
         });
 
       setAllLeads(cleanLeads);
       setAllUsers(cleanUsers);
+      setActiveOutsiders(Array.isArray(rawOutsiders) ? rawOutsiders : []);
     } catch (err) {
       console.error("Error loading dashboard master data:", err);
       setError("Unable to retrieve dashboard metrics. Please try again.");
@@ -188,15 +198,61 @@ export default function ChiefAdminLeadsDashboard() {
     return () => clearTimeout(timer);
   }, []);
 
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL'); // 'ALL', 'SALES_MANAGER', 'OUTSIDER'
+
   // Helper to map and resolve User IDs to human-readable names
   const getUserName = (userId) => {
-    const user = allUsers.find(u => String(u.id || u.userId) === String(userId));
+    const user = allUsers.find(u => u && String(u.id || u.userId || u.user_id || '') === String(userId));
     if (user) {
-      const fName = user.firstName || user.firstname || '';
-      const lName = user.lastName || user.lastname || '';
-      return `${fName} ${lName}`.trim() || user.username || user.email || `Rep ${userId}`;
+      const fName = user.firstName || user.firstname || user.first_name || '';
+      const lName = user.lastName || user.lastname || user.last_name || '';
+      return `${fName} ${lName}`.trim() || user.fullName || user.name || user.username || user.email || `Rep ${userId}`;
     }
     return `Rep ${userId}`;
+  };
+
+  // Helper to get role (Outsider vs Sales Manager)
+  const getUserRole = (repName) => {
+    if (!repName || repName === 'All Team Members') return null;
+    const cleanRep = String(repName).trim().toLowerCase();
+
+    // 1. Check if rep is in activeOutsiders returned by the API
+    const isInOutsidersApi = (Array.isArray(activeOutsiders) ? activeOutsiders : []).some(o => {
+      if (!o || typeof o !== 'object') return false;
+      const first = String(o.firstName || o.firstname || o.first_name || '').trim();
+      const last = String(o.lastName || o.lastname || o.last_name || '').trim();
+      const fullName = `${first} ${last}`.trim() || String(o.fullName || o.name || o.username || o.email || '').trim();
+      const uid = String(o.id || o.userId || o.user_id || '').trim();
+      return fullName.toLowerCase() === cleanRep || uid === cleanRep;
+    });
+
+    if (isInOutsidersApi) return 'Outsider';
+
+    // 2. Search in allUsers
+    const user = (Array.isArray(allUsers) ? allUsers : []).find(u => {
+      if (!u || typeof u !== 'object') return false;
+      const first = String(u.firstName || u.firstname || u.first_name || '').trim();
+      const last = String(u.lastName || u.lastname || u.last_name || '').trim();
+      const fullName = `${first} ${last}`.trim() || String(u.fullName || u.name || u.username || u.email || '').trim();
+      const uid = String(u.id || u.userId || u.user_id || '').trim();
+      return fullName.toLowerCase() === cleanRep || uid === cleanRep;
+    });
+
+    if (user) {
+      const userStr = JSON.stringify(user).toLowerCase();
+      if (userStr.includes('outsider') || userStr.includes('outside') || user.isOutside || user.isOutsider) {
+        return 'Outsider';
+      }
+    }
+
+    // 3. Fallback: Check if lead records for rep contain outsider role markers
+    const lead = (Array.isArray(mappedLeads) ? mappedLeads : []).find(l => l && String(l.owner || '').trim().toLowerCase() === cleanRep);
+    if (lead) {
+      const leadStr = JSON.stringify(lead).toLowerCase();
+      if (leadStr.includes('outsider') || leadStr.includes('outside')) return 'Outsider';
+    }
+
+    return 'Sales Manager';
   };
 
   // Month navigation handlers
@@ -298,8 +354,17 @@ export default function ChiefAdminLeadsDashboard() {
   // 4. Extract unique sales representatives for select buttons/dropdown
   const SALES_REPS = useMemo(() => {
     const names = new Set(mappedLeads.map(l => l.owner).filter(Boolean));
-    return ['All Team Members', ...Array.from(names).sort()];
-  }, [mappedLeads]);
+    const list = Array.from(names);
+    
+    let filteredList = list;
+    if (selectedRoleFilter === 'SALES_MANAGER') {
+      filteredList = list.filter(name => getUserRole(name) === 'Sales Manager');
+    } else if (selectedRoleFilter === 'OUTSIDER') {
+      filteredList = list.filter(name => getUserRole(name) === 'Outsider');
+    }
+
+    return ['All Team Members', ...filteredList.sort()];
+  }, [mappedLeads, selectedRoleFilter, allUsers]);
 
   // 5. Ownership breakdown (Group by owner to show individual summaries)
   const ownershipSummary = useMemo(() => {
@@ -1049,15 +1114,52 @@ export default function ChiefAdminLeadsDashboard() {
             <div className="flex flex-col gap-6">
               
               {/* Representative Horizontal Chip Strip */}
-              <div className="flex-col gap-2">
-                <p className="text-muted" style={{ fontSize: '13px', fontWeight: '600' }}>Filter Overview By Representative:</p>
-                <div className="timeline-strip hide-scrollbar" style={{ padding: '4px 0 10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-muted" style={{ fontSize: '13px', fontWeight: '600' }}>Filter Overview By Representative:</p>
                   
+                  {/* Role Category Toggle Pills */}
+                  <div className="flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-white/5">
+                    <button
+                      onClick={() => setSelectedRoleFilter('ALL')}
+                      className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                        selectedRoleFilter === 'ALL'
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      All Roles
+                    </button>
+                    <button
+                      onClick={() => setSelectedRoleFilter('SALES_MANAGER')}
+                      className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                        selectedRoleFilter === 'SALES_MANAGER'
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      Sales Managers
+                    </button>
+                    <button
+                      onClick={() => setSelectedRoleFilter('OUTSIDER')}
+                      className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                        selectedRoleFilter === 'OUTSIDER'
+                          ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      Outsiders
+                    </button>
+                  </div>
+                </div>
+
+                <div className="timeline-strip hide-scrollbar" style={{ padding: '4px 0 10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   {SALES_REPS.map((repName) => {
                     const isActive = selectedRep === repName;
                     const hasActiveDeals = repName === 'All Team Members' 
                       ? mappedLeads.length > 0 
                       : ownershipSummary.some(o => o.owner === repName && o.totalDeals > 0);
+                    const role = getUserRole(repName);
 
                     return (
                       <button
@@ -1089,6 +1191,20 @@ export default function ChiefAdminLeadsDashboard() {
                           background: hasActiveDeals ? '#10b981' : '#64748b'
                         }} />
                         <span>{repName}</span>
+                        {role && (
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            padding: '2px 7px',
+                            borderRadius: '10px',
+                            background: role === 'Outsider' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                            color: role === 'Outsider' ? '#c084fc' : '#38bdf8',
+                            border: role === 'Outsider' ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
+                            marginLeft: '2px'
+                          }}>
+                            {role}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -1100,8 +1216,21 @@ export default function ChiefAdminLeadsDashboard() {
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '8px', marginBottom: '4px' }}>
                     <User size={18} className="text-blue-400" />
-                    <h3 style={{ fontSize: '18px', fontWeight: '700' }}>
-                      {selectedRep === 'All Team Members' ? 'Team Performance Overview' : `${selectedRep}'s Performance`}
+                    <h3 style={{ fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span>{selectedRep === 'All Team Members' ? 'Team Performance Overview' : `${selectedRep}'s Performance`}</span>
+                      {selectedRep !== 'All Team Members' && getUserRole(selectedRep) && (
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          padding: '3px 10px',
+                          borderRadius: '12px',
+                          background: getUserRole(selectedRep) === 'Outsider' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                          color: getUserRole(selectedRep) === 'Outsider' ? '#c084fc' : '#38bdf8',
+                          border: getUserRole(selectedRep) === 'Outsider' ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)'
+                        }}>
+                          {getUserRole(selectedRep)}
+                        </span>
+                      )}
                     </h3>
                   </div>
 
@@ -1264,6 +1393,7 @@ export default function ChiefAdminLeadsDashboard() {
                           <thead>
                             <tr style={{ background: 'rgba(0,0,0,0.15)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                               <th style={{ padding: '14px 24px', fontSize: '13px', fontWeight: '600', color: '#94a3b8' }}>Sales Representative</th>
+                              <th style={{ padding: '14px 24px', fontSize: '13px', fontWeight: '600', color: '#94a3b8', textAlign: 'center' }}>Role</th>
                               <th style={{ padding: '14px 24px', fontSize: '13px', fontWeight: '600', color: '#94a3b8', textAlign: 'center' }}>Deals Owned</th>
                               <th style={{ padding: '14px 24px', fontSize: '13px', fontWeight: '600', color: '#94a3b8', textAlign: 'right' }}>Total Value</th>
                             </tr>
@@ -1271,38 +1401,56 @@ export default function ChiefAdminLeadsDashboard() {
                           <tbody>
                             {ownershipSummary.length === 0 ? (
                               <tr>
-                                <td colSpan="3" style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
+                                <td colSpan="4" style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
                                   No team member has active leads this month.
                                 </td>
                               </tr>
                             ) : (
-                              ownershipSummary.map((rep, idx) => (
-                                <tr 
-                                  key={rep.owner} 
-                                  style={{ 
-                                    borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                    background: idx === 0 ? 'rgba(59, 130, 246, 0.02)' : 'transparent',
-                                    transition: 'background 0.2s ease'
-                                  }}
-                                  className="hover:bg-white/[0.02] cursor-pointer"
-                                  onClick={() => setSelectedRep(rep.owner)}
-                                >
-                                  <td style={{ padding: '14px 24px', fontSize: '14px', fontWeight: '600' }}>
-                                    <div className="flex items-center gap-2">
-                                      {idx === 0 && <Sparkles size={12} color="#fbbf24" />}
-                                      <span>{rep.owner}</span>
-                                    </div>
-                                  </td>
-                                  <td style={{ padding: '14px 24px', fontSize: '14px', textAlign: 'center' }}><RunningNumber value={rep.totalDeals} /></td>
-                                  <td style={{ padding: '14px 24px', fontSize: '14px', fontWeight: '700', color: '#60a5fa', textAlign: 'right' }}><RunningNumber value={rep.totalValue} formatter={formatValue} /></td>
-                                </tr>
-                              ))
+                              ownershipSummary.map((rep, idx) => {
+                                const role = getUserRole(rep.owner);
+                                return (
+                                  <tr 
+                                    key={rep.owner} 
+                                    style={{ 
+                                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                      background: idx === 0 ? 'rgba(59, 130, 246, 0.02)' : 'transparent',
+                                      transition: 'background 0.2s ease'
+                                    }}
+                                    className="hover:bg-white/[0.02] cursor-pointer"
+                                    onClick={() => setSelectedRep(rep.owner)}
+                                  >
+                                    <td style={{ padding: '14px 24px', fontSize: '14px', fontWeight: '600' }}>
+                                      <div className="flex items-center gap-2">
+                                        {idx === 0 && <Sparkles size={12} color="#fbbf24" />}
+                                        <span>{rep.owner}</span>
+                                      </div>
+                                    </td>
+                                    <td style={{ padding: '14px 24px', fontSize: '14px', textAlign: 'center' }}>
+                                      {role && (
+                                        <span style={{
+                                          fontSize: '11px',
+                                          fontWeight: '700',
+                                          padding: '3px 10px',
+                                          borderRadius: '12px',
+                                          background: role === 'Outsider' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                                          color: role === 'Outsider' ? '#c084fc' : '#38bdf8',
+                                          border: role === 'Outsider' ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)'
+                                        }}>
+                                          {role}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '14px 24px', fontSize: '14px', textAlign: 'center' }}><RunningNumber value={rep.totalDeals} /></td>
+                                    <td style={{ padding: '14px 24px', fontSize: '14px', fontWeight: '700', color: '#60a5fa', textAlign: 'right' }}><RunningNumber value={rep.totalValue} formatter={formatValue} /></td>
+                                  </tr>
+                                );
+                              })
                             )}
 
                             {/* Combined Row */}
                             {ownershipSummary.length > 0 && (
                               <tr style={{ background: 'rgba(0,0,0,0.3)', borderTop: '2px solid rgba(255,255,255,0.1)' }}>
-                                <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: '700' }}>Total Combined Summary</td>
+                                <td colSpan="2" style={{ padding: '16px 24px', fontSize: '14px', fontWeight: '700' }}>Total Combined Summary</td>
                                 <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: '700', textAlign: 'center' }}>
                                   <RunningNumber value={summary.count} />
                                 </td>

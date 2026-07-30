@@ -626,8 +626,13 @@ export const getAllUsers = async () => {
     const res = await apiMethods.get(`/getAllUsers`);
     return res;
   } catch (error) {
-    console.error('Get All Users Error:', error);
-    throw error;
+    try {
+      const fallbackRes = await apiMethods.get(`/api/v1/getAllUsers`);
+      return fallbackRes;
+    } catch (err) {
+      console.error('Get All Users Error:', error);
+      throw error;
+    }
   }
 };
 // Add this right next to your getActiveOutsiders function

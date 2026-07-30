@@ -140,6 +140,7 @@ export default function DssrTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('ALL'); // 'ALL' | 'TODAY' | 'YESTERDAY' | 'THIS_WEEK' | 'THIS_MONTH'
   const [selectedUserFilter, setSelectedUserFilter] = useState('ALL');
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL'); // 'ALL' | 'SALES_MANAGER' | 'OUTSIDER'
   const [viewMode, setViewMode] = useState('table'); // 'grid' | 'table'
 
   // Focus Detail Modal State
@@ -237,7 +238,7 @@ export default function DssrTab() {
         card.callType.toLowerCase().includes(query);
 
       const matchesDate = matchesDateFilter(card.rawDate, dateFilter);
-      const matchesUser = selectedUserFilter === 'ALL' || card.userId === String(selectedUserFilter);
+      const matchesUser = selectedUserFilter === 'ALL' || card.userId === String(selectedUserFilter) || card.repName.toLowerCase() === String(selectedUserFilter).toLowerCase();
 
       return matchesSearch && matchesDate && matchesUser;
     });
@@ -256,7 +257,7 @@ export default function DssrTab() {
         card.callType.toLowerCase().includes(query);
 
       const matchesDate = matchesDateFilter(card.rawDate, dateFilter);
-      const matchesUser = selectedUserFilter === 'ALL' || card.userId === String(selectedUserFilter);
+      const matchesUser = selectedUserFilter === 'ALL' || card.userId === String(selectedUserFilter) || card.repName.toLowerCase() === String(selectedUserFilter).toLowerCase();
 
       return matchesSearch && matchesDate && matchesUser;
     });
@@ -274,7 +275,7 @@ export default function DssrTab() {
         card.repName.toLowerCase().includes(query);
 
       const matchesDate = matchesDateFilter(card.rawDate, dateFilter);
-      const matchesUser = selectedUserFilter === 'ALL' || card.userId === String(selectedUserFilter);
+      const matchesUser = selectedUserFilter === 'ALL' || card.userId === String(selectedUserFilter) || card.repName.toLowerCase() === String(selectedUserFilter).toLowerCase();
 
       return matchesSearch && matchesDate && matchesUser;
     });
@@ -338,43 +339,131 @@ export default function DssrTab() {
       }))
       .sort((a, b) => b.total - a.total);
   }, [allCallCards, allTaskCards, allMeetingCards]);
-  // Extracted list of Sales Managers for the filter dropdown
+
+  // Helper to resolve role for any sales rep in DSSR tab
+  const getRepRoleTag = (repNameOrIdOrUser) => {
+    if (!repNameOrIdOrUser) return 'Sales Manager';
+
+    if (typeof repNameOrIdOrUser === 'object') {
+      const userStr = JSON.stringify(repNameOrIdOrUser).toLowerCase();
+      if (userStr.includes('outsider') || userStr.includes('outside') || repNameOrIdOrUser.isOutside || repNameOrIdOrUser.isOutsider) {
+        return 'Outsider';
+      }
+      return 'Sales Manager';
+    }
+
+    const clean = String(repNameOrIdOrUser).trim().toLowerCase();
+
+    const user = (Array.isArray(users) ? users : []).find((u) => {
+      if (!u || typeof u !== 'object') return false;
+      const first = String(u.firstName || u.firstname || u.first_name || '').trim();
+      const last = String(u.lastName || u.lastname || u.last_name || '').trim();
+      const fullName = `${first} ${last}`.trim() || String(u.name || u.userName || u.username || u.email || '').trim();
+      const uid = String(u.id || u.userId || u.user_id || '').trim();
+      return fullName.toLowerCase() === clean || uid === clean;
+    });
+
+    if (user) {
+      const userStr = JSON.stringify(user).toLowerCase();
+      if (userStr.includes('outsider') || userStr.includes('outside') || user.isOutside || user.isOutsider) {
+        return 'Outsider';
+      }
+    }
+
+    if (clean.includes('outsider')) return 'Outsider';
+    return 'Sales Manager';
+  };
+
+  // Extracted list of Representatives WHO HAVE RELATED ACTIVITY in DSSR logs
   const salesManagerOptions = useMemo(() => {
     const list = [];
     const seenIds = new Set();
+    const seenNames = new Set();
 
-    // 1. First add managers returned from getSalesManagers API
-    salesManagers.forEach((m) => {
-      const uid = String(m.id ?? m.userId ?? '');
-      if (uid && !seenIds.has(uid)) {
-        seenIds.add(uid);
-        const firstName = String(m.firstName || m.firstname || m.first_name || '').trim();
-        const lastName = String(m.lastName || m.lastname || m.last_name || '').trim();
-        const fullName = `${firstName} ${lastName}`.trim() || m.name || m.userName || m.username || m.email || `Manager #${uid}`;
-        list.push({ id: uid, name: fullName });
-      }
+    // 1. Collect set of user IDs and names present in DSSR activity cards
+    const activeUserIds = new Set();
+    const activeUserNames = new Set();
+
+    allCallCards.forEach((c) => {
+      if (c.userId) activeUserIds.add(String(c.userId));
+      if (c.repName) activeUserNames.add(c.repName.trim().toLowerCase());
+    });
+    allTaskCards.forEach((t) => {
+      if (t.userId) activeUserIds.add(String(t.userId));
+      if (t.repName) activeUserNames.add(t.repName.trim().toLowerCase());
+    });
+    allMeetingCards.forEach((m) => {
+      if (m.userId) activeUserIds.add(String(m.userId));
+      if (m.repName) activeUserNames.add(m.repName.trim().toLowerCase());
     });
 
-    // 2. Also check users array for any Sales Managers
+    // Helper to add user if they have active DSSR records
+    const addIfActive = (uid, fullName, userObj) => {
+      const cleanUid = String(uid || '').trim();
+      const cleanName = String(fullName || '').trim();
+      if (!cleanName && !cleanUid) return;
+
+      const lowerName = cleanName.toLowerCase();
+      const hasActivity = (cleanUid && activeUserIds.has(cleanUid)) || (lowerName && activeUserNames.has(lowerName));
+
+      if (hasActivity && !seenNames.has(lowerName)) {
+        if (cleanUid) seenIds.add(cleanUid);
+        seenNames.add(lowerName);
+        const role = getRepRoleTag(userObj || cleanName || cleanUid);
+        list.push({ id: cleanUid || cleanName, name: cleanName, role });
+      }
+    };
+
+    // Check users array
     users.forEach((u) => {
-      const uid = String(u.id ?? u.userId ?? '');
-      const roleStr = String(u.role || u.roleName || u.designation || u.userRole || '').toLowerCase();
-      if (uid && !seenIds.has(uid) && (roleStr.includes('manager') || roleStr.includes('sales') || salesManagers.length === 0)) {
-        seenIds.add(uid);
-        const name = userMap[uid] || u.name || `User #${uid}`;
-        list.push({ id: uid, name });
+      if (!u || typeof u !== 'object') return;
+      const uid = String(u.id ?? u.userId ?? u.user_id ?? '');
+      const firstName = String(u.firstName || u.firstname || u.first_name || '').trim();
+      const lastName = String(u.lastName || u.lastname || u.last_name || '').trim();
+      const fullName = `${firstName} ${lastName}`.trim() || u.name || u.userName || u.username || u.email || '';
+      addIfActive(uid, fullName, u);
+    });
+
+    // Check salesManagers array
+    salesManagers.forEach((m) => {
+      if (!m || typeof m !== 'object') return;
+      const uid = String(m.id ?? m.userId ?? m.user_id ?? '');
+      const firstName = String(m.firstName || m.firstname || m.first_name || '').trim();
+      const lastName = String(m.lastName || m.lastname || m.last_name || '').trim();
+      const fullName = `${firstName} ${lastName}`.trim() || m.name || m.userName || m.username || m.email || '';
+      addIfActive(uid, fullName, m);
+    });
+
+    // Fallback: collect any active reps directly from cards that weren't in user lists
+    [...allCallCards, ...allTaskCards, ...allMeetingCards].forEach((card) => {
+      const uid = String(card.userId || '');
+      const name = String(card.repName || '').trim();
+      if (name && !seenNames.has(name.toLowerCase())) {
+        addIfActive(uid, name, null);
       }
     });
 
     return list.sort((a, b) => a.name.localeCompare(b.name));
-  }, [salesManagers, users, userMap]);
+  }, [salesManagers, users, allCallCards, allTaskCards, allMeetingCards]);
 
-  const hasActiveFilters = searchQuery !== '' || dateFilter !== 'ALL' || selectedUserFilter !== 'ALL';
+  // Filtered representatives for chip strip
+  const dssrReps = useMemo(() => {
+    let filtered = salesManagerOptions;
+    if (selectedRoleFilter === 'SALES_MANAGER') {
+      filtered = salesManagerOptions.filter((m) => m.role === 'Sales Manager');
+    } else if (selectedRoleFilter === 'OUTSIDER') {
+      filtered = salesManagerOptions.filter((m) => m.role === 'Outsider');
+    }
+    return [{ id: 'ALL', name: 'All Team Members', role: null }, ...filtered];
+  }, [salesManagerOptions, selectedRoleFilter]);
+
+  const hasActiveFilters = searchQuery !== '' || dateFilter !== 'ALL' || selectedUserFilter !== 'ALL' || selectedRoleFilter !== 'ALL';
 
   const resetFilters = () => {
     setSearchQuery('');
     setDateFilter('ALL');
     setSelectedUserFilter('ALL');
+    setSelectedRoleFilter('ALL');
   };
 
   return (
@@ -515,53 +604,127 @@ export default function DssrTab() {
           </div>
 
           {/* Filter Toolbar Strip */}
-          <div className="pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="flex items-center gap-1.5 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-                <Filter className="h-3.5 w-3.5 text-blue-400" />
-                Filters:
-              </span>
+          <div className="pt-3 border-t border-white/5 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="flex items-center gap-1.5 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                  <Filter className="h-3.5 w-3.5 text-blue-400" />
+                  Filter Overview By Representative:
+                </span>
 
-              {/* Date Filter Dropdown */}
-              <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-slate-200 focus:outline-none focus:border-blue-500 font-medium cursor-pointer"
-              >
-                <option value="ALL">All Time</option>
-                <option value="TODAY">Today</option>
-                <option value="YESTERDAY">Yesterday</option>
-                <option value="THIS_WEEK">This Week</option>
-                <option value="THIS_MONTH">This Month</option>
-              </select>
-
-              {/* Sales Manager Dropdown Filter */}
-              <select
-                value={selectedUserFilter}
-                onChange={(e) => setSelectedUserFilter(e.target.value)}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-slate-200 focus:outline-none focus:border-blue-500 font-medium cursor-pointer"
-              >
-                <option value="ALL">All Sales Managers</option>
-                {salesManagerOptions.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-
-              {/* Reset Filters button */}
-              {hasActiveFilters && (
-                <button
-                  onClick={resetFilters}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 font-semibold transition"
+                {/* Date Filter Dropdown */}
+                <select
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-slate-200 focus:outline-none focus:border-blue-500 font-medium cursor-pointer"
                 >
-                  <RotateCcw className="h-3 w-3" />
-                  Reset Filters
+                  <option value="ALL">All Time</option>
+                  <option value="TODAY">Today</option>
+                  <option value="YESTERDAY">Yesterday</option>
+                  <option value="THIS_WEEK">This Week</option>
+                  <option value="THIS_MONTH">This Month</option>
+                </select>
+
+                {/* Reset Filters button */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={resetFilters}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 font-semibold transition"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reset Filters
+                  </button>
+                )}
+              </div>
+
+              {/* Role Category Toggle Pills */}
+              <div className="flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-white/5">
+                <button
+                  onClick={() => setSelectedRoleFilter('ALL')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    selectedRoleFilter === 'ALL'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  All Roles
                 </button>
-              )}
+                <button
+                  onClick={() => setSelectedRoleFilter('SALES_MANAGER')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    selectedRoleFilter === 'SALES_MANAGER'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Sales Managers
+                </button>
+                <button
+                  onClick={() => setSelectedRoleFilter('OUTSIDER')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    selectedRoleFilter === 'OUTSIDER'
+                      ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Outsiders
+                </button>
+              </div>
             </div>
 
-            <div className="text-slate-400 font-medium text-[11px] font-mono">
+            {/* Representative Horizontal Chips */}
+            <div className="timeline-strip hide-scrollbar flex items-center gap-2 overflow-x-auto" style={{ padding: '4px 0 8px 0' }}>
+              {dssrReps.map((rep) => {
+                const isActive = selectedUserFilter === rep.id || (rep.id !== 'ALL' && selectedUserFilter === rep.name);
+                return (
+                  <button
+                    key={rep.id}
+                    onClick={() => setSelectedUserFilter(rep.id)}
+                    style={{
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 16px',
+                      borderRadius: '30px',
+                      border: '1px solid',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      background: isActive ? 'var(--primary, #2563eb)' : 'rgba(255,255,255,0.03)',
+                      borderColor: isActive ? '#3b82f6' : 'rgba(255,255,255,0.08)',
+                      color: '#fff',
+                      boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
+                    }}
+                  >
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: isActive ? '#10b981' : '#64748b'
+                    }} />
+                    <span>{rep.name}</span>
+                    {rep.role && (
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        background: rep.role === 'Outsider' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                        color: rep.role === 'Outsider' ? '#c084fc' : '#38bdf8',
+                        border: rep.role === 'Outsider' ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
+                        marginLeft: '2px'
+                      }}>
+                        {rep.role}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="text-slate-400 font-medium text-[11px] font-mono self-end">
               Showing{' '}
               <strong className="text-white">
                 {activeSubTab === 'calls' ? filteredCallCards.length : activeSubTab === 'tasks' ? filteredTaskCards.length : filteredMeetingCards.length}
@@ -855,7 +1018,16 @@ export default function DssrTab() {
                             </span>
                           </td>
                           <td className="py-3.5 px-5 text-slate-300 font-medium">
-                            {card.repName}
+                            <div className="flex items-center gap-2">
+                              <span>{card.repName}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                getRepRoleTag(card.repName) === 'Outsider'
+                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              }`}>
+                                {getRepRoleTag(card.repName)}
+                              </span>
+                            </div>
                           </td>
                           <td className="py-3.5 px-5 text-slate-400 font-mono">
                             {card.formattedDate} {card.formattedTime}
@@ -982,7 +1154,16 @@ export default function DssrTab() {
                             </span>
                           </td>
                           <td className="py-3.5 px-5 text-slate-300 font-medium">
-                            {card.repName}
+                            <div className="flex items-center gap-2">
+                              <span>{card.repName}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                getRepRoleTag(card.repName) === 'Outsider'
+                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              }`}>
+                                {getRepRoleTag(card.repName)}
+                              </span>
+                            </div>
                           </td>
                           <td className="py-3.5 px-5 text-slate-400 font-mono">
                             {card.formattedDate} {card.formattedTime}
@@ -1105,7 +1286,16 @@ export default function DssrTab() {
                             {meeting.momText}
                           </td>
                           <td className="py-3.5 px-5 text-slate-300 font-medium">
-                            {meeting.repName}
+                            <div className="flex items-center gap-2">
+                              <span>{meeting.repName}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                getRepRoleTag(meeting.repName) === 'Outsider'
+                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              }`}>
+                                {getRepRoleTag(meeting.repName)}
+                              </span>
+                            </div>
                           </td>
                           <td className="py-3.5 px-5 text-slate-400 font-mono">
                             {meeting.formattedDate}

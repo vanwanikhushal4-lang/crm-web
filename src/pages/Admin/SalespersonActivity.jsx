@@ -183,6 +183,15 @@ export default function SalespersonActivity() {
     return `Sales Rep ${user?.id || user?.userId || 'Unknown'}`;
   };
 
+  const getRepRole = (user) => {
+    if (!user) return 'Sales Manager';
+    const userStr = JSON.stringify(user).toLowerCase();
+    if (userStr.includes('outsider') || userStr.includes('outside') || user.isOutside || user.isOutsider) {
+      return 'Outsider';
+    }
+    return 'Sales Manager';
+  };
+
   const resolveEntityName = (item) => {
     const custId = item.customerId || item.customer_id || item.account_id || item.accountId || item.idCustomer || item.customerMasterId;
     const compId = item.companyId || item.company_id || item.account_id;
@@ -285,8 +294,17 @@ export default function SalespersonActivity() {
                     <div className={`font-semibold text-sm truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>
                       {getRepName(user)}
                     </div>
-                    <div className={`text-xs mt-0.5 ${isSelected ? 'text-blue-100' : 'text-slate-500'} font-mono`}>
-                      ID: {user.id || user.userId}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-xs ${isSelected ? 'text-blue-100' : 'text-slate-500'} font-mono`}>
+                        ID: {user.id || user.userId}
+                      </span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                        getRepRole(user) === 'Outsider' 
+                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                          : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                      }`}>
+                        {getRepRole(user)}
+                      </span>
                     </div>
                   </div>
                   <ChevronRight className={`h-4 w-4 shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
@@ -311,7 +329,16 @@ export default function SalespersonActivity() {
           <>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-white/5 mb-6">
               <div>
-                <h2 className="text-xl font-bold text-slate-100">{getRepName(selectedUser)}'s Activity</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-slate-100">{getRepName(selectedUser)}'s Activity</h2>
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                    getRepRole(selectedUser) === 'Outsider' 
+                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                      : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  }`}>
+                    {getRepRole(selectedUser)}
+                  </span>
+                </div>
                 <p className="text-slate-400 text-xs mt-0.5">Historical timeline of daily logins, field logs, tasks & calls.</p>
               </div>
 
