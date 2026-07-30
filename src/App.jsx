@@ -11,6 +11,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/admin/*" element={<AdminDashboard />} />
         <Route path="/sales/*" element={<SalesManagerDashboard />} />
+        <Route path="/outsider/*" element={<SalesManagerDashboard />} />
       </Routes>
     </BrowserRouter>
   );

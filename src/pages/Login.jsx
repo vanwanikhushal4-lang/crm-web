@@ -65,7 +65,7 @@ export default function Login() {
       const token = res?.data?.jwtToken || res?.data?.token || res?.token || res?.data?.jwt;
       const userDetails = res?.data?.user || res?.user || res?.data;
       const roleType = res?.data?.roleType || userDetails?.roleType;
-      const roleRaw = res?.data?.role || userDetails?.role;
+      const roleRaw = res?.data?.role || userDetails?.role || res?.data?.roleName || userDetails?.roleName || res?.data?.designation || userDetails?.designation;
       const statusCode = res?.statusCode || res?.status;
       const responseMessage = res?.message || res?.data?.message || res?.error;
 
@@ -95,11 +95,14 @@ export default function Login() {
       const normalizeRole = (v) => String(v || '').toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
       const effectiveRole = normalizeRole(roleRaw || roleType || '');
       
-      const isAdmin = effectiveRole === "admin";
-      const isChiefAdmin = effectiveRole === "chiefadmin";
+      const isChiefAdmin = effectiveRole.includes("chiefadmin");
+      const isAdmin = effectiveRole.includes("admin") && !isChiefAdmin;
+      const isOutsider = effectiveRole.includes("outsider");
 
       if (isChiefAdmin || isAdmin) {
         navigate('/admin');
+      } else if (isOutsider) {
+        navigate('/outsider');
       } else {
         navigate('/sales');
       }

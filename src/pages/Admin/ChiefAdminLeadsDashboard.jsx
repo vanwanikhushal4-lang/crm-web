@@ -394,6 +394,36 @@ export default function ChiefAdminLeadsDashboard() {
     return ownershipSummary.find(x => x.owner.toLowerCase() === selectedRep.toLowerCase()) || null;
   }, [selectedRep, ownershipSummary, mappedLeads, summary, hotLeads, warmLeads, wonLeads, lostLeads]);
 
+  // Console log active pipelines calculation whenever selected representative or month data updates
+  useEffect(() => {
+    if (!currentOwnerData) return;
+
+    const repName = currentOwnerData.owner;
+    const leadsForRep = selectedRep === 'All Team Members'
+      ? mappedLeads
+      : mappedLeads.filter(l => l.owner.toLowerCase() === selectedRep.toLowerCase());
+
+    const hotCount = leadsForRep.filter(l => l.isHot && !l.isWon && !l.isLost).length;
+    const warmCount = leadsForRep.filter(l => l.isWarm && !l.isWon && !l.isLost).length;
+    const wonCount = leadsForRep.filter(l => l.isWon).length;
+    const lostCount = leadsForRep.filter(l => l.isLost).length;
+    const otherCount = leadsForRep.filter(l => !l.isHot && !l.isWarm && !l.isWon && !l.isLost).length;
+
+    console.group(`📊 [Active Pipeline Deals Calculation] - Representative: ${repName}`);
+    console.log(`Selected Period: ${getMonthYearDisplayName(selectedDate)}`);
+    console.log(`Total Active Pipelines (Deals Count): ${leadsForRep.length}`);
+    console.log(`Calculation Breakdown:`);
+    console.log(`  - 🔥 Hot Deals: ${hotCount}`);
+    console.log(`  - ☀️ Warm Deals: ${warmCount}`);
+    console.log(`  - 🏆 Won Deals: ${wonCount}`);
+    console.log(`  - ❌ Lost Deals: ${lostCount}`);
+    console.log(`  - 📋 Other/Neutral Deals: ${otherCount}`);
+    console.log(`Formula: Total Deals = Hot (${hotCount}) + Warm (${warmCount}) + Won (${wonCount}) + Lost (${lostCount}) + Other (${otherCount}) = ${leadsForRep.length}`);
+    console.log(`All Deals List for ${repName}:`, leadsForRep);
+    console.groupEnd();
+  }, [currentOwnerData, selectedRep, mappedLeads, selectedDate]);
+
+
   // Leads filtered for dashboard graphs based on representative selection
   const filteredLeadsForCharts = useMemo(() => {
     if (selectedRep === 'All Team Members') {

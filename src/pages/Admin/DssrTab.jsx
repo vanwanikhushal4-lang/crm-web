@@ -644,7 +644,7 @@ export default function DssrTab() {
             </div>
 
             {/* Active Representatives */}
-            <div className="bg-gradient-to-br from-[#0c1220] to-[#111a2e] border border-white/5 rounded-2xl p-5 shadow-lg relative overflow-hidden group hover:border-amber-500/20 transition duration-300">
+            <div className="bg-linear-to-br from-[#0c1220] to-[#111a2e] border border-white/5 rounded-2xl p-5 shadow-lg relative overflow-hidden group hover:border-amber-500/20 transition duration-300">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Reps</p>

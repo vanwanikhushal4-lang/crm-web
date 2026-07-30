@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home,
   Calendar as CalendarIcon,
@@ -32,23 +32,31 @@ import DssrTab from './Admin/DssrTab';
 
 export default function SalesManagerDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const storedRole = (localStorage.getItem('role') || '').toLowerCase();
+  const isOutsider = location.pathname.startsWith('/outsider') || storedRole === 'outsider';
+
+  const portalTitle = isOutsider ? 'Outsider Portal' : 'Sales Portal';
+  const roleLabel = isOutsider ? 'Outsider' : 'Sales Manager';
+  const tabStorageKey = isOutsider ? 'outsiderActiveTab' : 'salesActiveTab';
+
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('salesActiveTab') || 'pipeline';
+    return localStorage.getItem(tabStorageKey) || 'pipeline';
   });
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    localStorage.setItem('salesActiveTab', tab);
+    localStorage.setItem(tabStorageKey, tab);
   };
 
   const [userName, setUserName] = useState(() => {
-    return localStorage.getItem('userName') || 'Sales Manager';
+    return localStorage.getItem('userName') || roleLabel;
   });
 
   useEffect(() => {
     const storedName = localStorage.getItem('userName');
     const userId = localStorage.getItem('userId');
-    if ((!storedName || storedName === 'Sales Manager') && userId) {
+    if ((!storedName || storedName === 'Sales Manager' || storedName === 'Outsider') && userId) {
       getAllUsers().then((res) => {
         const arr = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
         const current = arr.find(u => String(u.id || u.userId) === String(userId));
@@ -63,7 +71,7 @@ export default function SalesManagerDashboard() {
         }
       }).catch(err => console.error("Error loading user name:", err));
     }
-  }, []);
+  }, [roleLabel]);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -149,7 +157,7 @@ export default function SalesManagerDashboard() {
               {!isSidebarCollapsed && (
                 <div className="animate-fade">
                   <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Biz Drive CRM</h1>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Sales Portal</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">{portalTitle}</span>
                 </div>
               )}
             </div>
@@ -196,7 +204,7 @@ export default function SalesManagerDashboard() {
             {!isSidebarCollapsed && (
               <div className="overflow-hidden animate-fade">
                 <p className="text-sm font-semibold text-slate-200 truncate">{userName}</p>
-                <p className="text-xs text-slate-500 truncate">Sales Manager</p>
+                <p className="text-xs text-slate-500 truncate">{roleLabel}</p>
               </div>
             )}
           </div>
@@ -233,7 +241,7 @@ export default function SalesManagerDashboard() {
               </div>
               <div>
                 <h1 className="font-bold text-base leading-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Biz Drive CRM</h1>
-                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Sales Portal</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">{portalTitle}</span>
               </div>
             </div>
             <button
@@ -277,7 +285,7 @@ export default function SalesManagerDashboard() {
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-200 truncate">{userName}</p>
-              <p className="text-xs text-slate-500 truncate">Sales Manager</p>
+              <p className="text-xs text-slate-500 truncate">{roleLabel}</p>
             </div>
           </div>
           <button
