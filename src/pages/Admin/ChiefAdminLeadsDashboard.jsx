@@ -19,7 +19,13 @@ import {
   CheckCircle2,
   XCircle
 } from 'lucide-react';
-import { getAllLeads, getAllUsers, getActiveOutsiders } from '../../api/apiFunctions/Login/Login_api_function';
+import { 
+  getAllLeads, 
+  getAllUsers, 
+  getActiveOutsiders,
+  getAllMomDetails,
+  getAllCustomerDetails
+} from '../../api/apiFunctions/Login/Login_api_function';
 import RunningNumber from '../../components/common/RunningNumber';
 
 // Safe list extraction helper to match nested database schemas
@@ -86,13 +92,35 @@ export const isLostLead = (lead) => {
 };
 
 export const isHotLead = (lead) => {
-  const p = String(lead?.priority || lead?.leadType || lead?.lead_type || '').trim().toUpperCase();
+  const p = String(lead?.priority || lead?.leadType || lead?.lead_type || lead?.pitch_details?.lead_type || '').trim().toUpperCase();
   return p === 'HOT' || p === 'HIGH';
 };
 
 export const isWarmLead = (lead) => {
-  const p = String(lead?.priority || lead?.leadType || lead?.lead_type || '').trim().toUpperCase();
+  const p = String(lead?.priority || lead?.leadType || lead?.lead_type || lead?.pitch_details?.lead_type || '').trim().toUpperCase();
   return p === 'WARM' || p === 'MEDIUM';
+};
+
+export const getCustomerRecordId = (customer) => {
+  const id = customer?.id ?? customer?.customerId ?? customer?.customer_id ?? customer?.customerID ?? '';
+  return id ? String(id) : '';
+};
+
+export const getMomCustomerId = (mom) => {
+  const id =
+    mom?.account_id ?? mom?.accountId ?? mom?.customer_id ?? mom?.customerId ??
+    mom?.customerID ?? mom?.account?.id ?? mom?.customer?.id ?? '';
+  return id ? String(id) : '';
+};
+
+export const getLeadCustomerId = (lead) => {
+  const id =
+    lead?.customerId ?? lead?.customer_id ?? lead?.customerID ??
+    lead?.accountId ?? lead?.account_id ?? lead?.accountID ??
+    lead?.customerMasterId ?? lead?.customer_master_id ??
+    lead?.customer?.id ?? lead?.customer?.customerId ??
+    lead?.account?.id ?? '';
+  return id ? String(id) : '';
 };
 
 // Maps backend User objects to an ID -> Name map for fast O(1) lookups
@@ -143,6 +171,8 @@ export default function ChiefAdminLeadsDashboard() {
   const [allLeads, setAllLeads] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [activeOutsiders, setActiveOutsiders] = useState([]);
+  const [allMoms, setAllMoms] = useState([]);
+  const [allCustomers, setAllCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -154,7 +184,7 @@ export default function ChiefAdminLeadsDashboard() {
     setIsLoading(true);
     setError(null);
     try {
-      const [leadsRes, usersRes, outsidersRes] = await Promise.all([
+      const [leadsRes, usersRes, outsidersRes, momsRes, customersRes] = await Promise.all([
         getAllLeads().catch((err) => {
           console.error("Failed to load leads:", err);
           return [];
@@ -166,12 +196,22 @@ export default function ChiefAdminLeadsDashboard() {
         getActiveOutsiders().catch((err) => {
           console.warn("Failed to load active outsiders:", err);
           return [];
+        }),
+        getAllMomDetails().catch((err) => {
+          console.warn("Failed to load mom details:", err);
+          return [];
+        }),
+        getAllCustomerDetails().catch((err) => {
+          console.warn("Failed to load customer details:", err);
+          return [];
         })
       ]);
 
       const rawLeads = extractList(leadsRes);
       const rawUsers = extractList(usersRes);
       const rawOutsiders = extractList(outsidersRes);
+      const rawMoms = extractList(momsRes);
+      const rawCustomers = extractList(customersRes);
 
       // User ID Filtering: Filters out userId === '2' (system/test user)
       const cleanUsers = (Array.isArray(rawUsers) ? rawUsers : []).filter(user => {
@@ -206,6 +246,8 @@ export default function ChiefAdminLeadsDashboard() {
       setAllLeads(cleanLeads);
       setAllUsers(cleanUsers);
       setActiveOutsiders(Array.isArray(rawOutsiders) ? rawOutsiders : []);
+      setAllMoms(Array.isArray(rawMoms) ? rawMoms : []);
+      setAllCustomers(Array.isArray(rawCustomers) ? rawCustomers : []);
     } catch (err) {
       console.error("Error loading dashboard master data:", err);
       setError("Unable to retrieve dashboard metrics. Please try again.");
@@ -308,15 +350,155 @@ export default function ChiefAdminLeadsDashboard() {
     return buildUserNameMap(allUsers);
   }, [allUsers]);
 
-  // 2. Map raw API leads to normalized UI records and filter by the selected month
+  // 1.5. Build dynamic unified pipeline items (combining direct leads, customer master, and MOM details)
+  const unifiedLeads = useMemo(() => {
+    const rawLeads = extractList(allLeads);
+    const rawCustomers = extractList(allCustomers);
+    const rawMoms = extractList(allMoms);
+
+    const customerMap = {};
+    const companyToId = {};
+    rawCustomers.forEach((c) => {
+      const id = getCustomerRecordId(c);
+      if (!id) return;
+      customerMap[id] = c;
+      const compName = (c.companyName || c.customerName || c.name || c.accountName || '').trim().toLowerCase();
+      if (compName && !companyToId[compName]) companyToId[compName] = id;
+    });
+
+    const sortedMoms = [...rawMoms].sort((a, b) => {
+      const left = Number(a?.id || new Date(a?.createdAt || a?.updatedAt || 0).getTime() || 0);
+      const right = Number(b?.id || new Date(b?.createdAt || b?.updatedAt || 0).getTime() || 0);
+      return left - right;
+    });
+
+    const latestMomByCustomer = {};
+    const companyToMom = {};
+    sortedMoms.forEach((mom) => {
+      const customerId = getMomCustomerId(mom);
+      if (customerId) {
+        latestMomByCustomer[customerId] = mom;
+      }
+      const compName = (mom.companyName || mom.customerName || mom.accountName || mom.company || '').trim().toLowerCase();
+      if (compName) {
+        companyToMom[compName] = mom;
+      }
+    });
+
+    const resolveLeadCustomerId = (lead) => {
+      const directId = getLeadCustomerId(lead);
+      if (directId && customerMap[directId]) return directId;
+      const compName = (lead?.company || lead?.companyName || lead?.customerName || lead?.accountName || '').trim().toLowerCase();
+      const mappedId = companyToId[compName];
+      if (mappedId && customerMap[mappedId]) return mappedId;
+      return directId || '';
+    };
+
+    const rows = [];
+    const processedCustomerIds = new Set();
+    const processedMomIds = new Set();
+
+    rawLeads.forEach((lead) => {
+      const customerId = resolveLeadCustomerId(lead);
+      const customer = customerId ? customerMap[customerId] : null;
+      const compName = (lead?.company || lead?.companyName || lead?.customerName || lead?.accountName || '').trim().toLowerCase();
+      const matchedMom = (customerId && latestMomByCustomer[customerId]) || companyToMom[compName] || null;
+
+      if (customerId) processedCustomerIds.add(customerId);
+      if (matchedMom?.id) processedMomIds.add(String(matchedMom.id));
+
+      rows.push({
+        lead,
+        mom: matchedMom,
+        customer,
+        isMomOnly: false
+      });
+    });
+
+    Object.entries(customerMap).forEach(([customerId, customer]) => {
+      if (processedCustomerIds.has(customerId)) return;
+      const mom = latestMomByCustomer[customerId];
+      if (mom && (!mom.id || !processedMomIds.has(String(mom.id)))) {
+        if (mom.id) processedMomIds.add(String(mom.id));
+        processedCustomerIds.add(customerId);
+        rows.push({
+          lead: null,
+          mom,
+          customer,
+          isMomOnly: true
+        });
+      }
+    });
+
+    sortedMoms.forEach((mom) => {
+      const momIdStr = mom?.id ? String(mom.id) : '';
+      if (momIdStr && processedMomIds.has(momIdStr)) return;
+
+      const customerId = getMomCustomerId(mom);
+      if (customerId && processedCustomerIds.has(customerId)) return;
+
+      if (momIdStr) processedMomIds.add(momIdStr);
+      if (customerId) processedCustomerIds.add(customerId);
+
+      rows.push({
+        lead: null,
+        mom,
+        customer: customerId ? customerMap[customerId] : null,
+        isMomOnly: true
+      });
+    });
+
+    return rows;
+  }, [allLeads, allCustomers, allMoms]);
+
+  // 2. Map raw API leads and MOM details to normalized UI records and filter by the selected month
   const mappedLeads = useMemo(() => {
-    return allLeads
-      .map(lead => {
-        const ownerId = String(lead.assignedTo || lead.userId || lead.user_id || '');
-        const won = isWonLead(lead);
-        const lost = isLostLead(lead);
-        const hot = isHotLead(lead);
-        const warm = isWarmLead(lead);
+    return unifiedLeads
+      .map(({ lead, mom, customer, isMomOnly }) => {
+        const pitch = mom?.pitch_details || {};
+        const outcome = mom?.outcome || {};
+
+        const ownerId = String(
+          lead?.assignedTo || lead?.userId || lead?.user_id || lead?.createdBy || lead?.salesmanId ||
+          mom?.userId || mom?.user_id || mom?.createdBy || mom?.assignedTo ||
+          customer?.userId || customer?.user_id || customer?.assignedTo || ''
+        );
+
+        const pitchedByWhom = pitch?.pitched_by_whom || mom?.competition_and_history?.pitched_by_whom || mom?.pitchedByWhom || mom?.pitched_by_whom || customer?.salesPerson || customer?.contactPersonName || '';
+
+        let owner = userNameMap[ownerId];
+        if (!owner && pitchedByWhom) {
+          const matchedUser = allUsers.find(u => {
+            const f = u.firstName || u.firstname || u.first_name || '';
+            const l = u.lastName || u.lastname || u.last_name || '';
+            const fn = `${f} ${l}`.trim() || u.fullName || u.username || u.email || '';
+            return fn.toLowerCase() === pitchedByWhom.trim().toLowerCase();
+          });
+          owner = matchedUser ? (userNameMap[String(matchedUser.id || matchedUser.userId || matchedUser.user_id)] || pitchedByWhom) : pitchedByWhom;
+        }
+        if (!owner) {
+          owner = lead?.ownerName || lead?.owner || 'Unassigned';
+        }
+
+        const company = 
+          lead?.companyName || lead?.company || lead?.customerName ||
+          customer?.companyName || customer?.customerName || customer?.name ||
+          mom?.companyName || mom?.customerName || mom?.accountName || mom?.company ||
+          'Unnamed Company';
+
+        const contactName =
+          lead?.contactName || lead?.contact ||
+          customer?.contactPerson || customer?.contactPersonName || customer?.name ||
+          mom?.contactPersonName || mom?.contactName ||
+          'Unassigned';
+
+        const rawBudget = lead?.dealValue || lead?.value || lead?.budget || pitch?.budget || mom?.budget || mom?.dealValue || '';
+        const numericValue = parseDealValue(rawBudget);
+
+        const won = isWonLead(lead) || isWonLead(mom);
+        const lost = isLostLead(lead) || isLostLead(mom);
+        const hot = isHotLead(lead) || isHotLead(mom);
+        const warm = isWarmLead(lead) || isWarmLead(mom) || (isMomOnly && !won && !lost && !hot);
 
         let priority = 'Other';
         if (won) priority = 'Won';
@@ -324,28 +506,37 @@ export default function ChiefAdminLeadsDashboard() {
         else if (hot) priority = 'Hot';
         else if (warm) priority = 'Warm';
 
+        const date = lead?.expectedCloseDate || lead?.expected_close_date || outcome?.follow_up_date || mom?.follow_up_date || mom?.meetingDate || mom?.createdAt || lead?.createdAt || '';
+
         return {
-          ...lead,
+          ...(lead || {}),
+          id: lead?.id || (mom ? `mom-${mom.id}` : `lead-${Math.random()}`),
           ownerId,
-          owner: userNameMap[ownerId] || lead.ownerName || lead.owner || 'Unassigned',
-          company: lead.companyName || lead.company || lead.customerName || 'Unnamed Company',
-          value: parseDealValue(lead.dealValue || lead.value || lead.budget),
+          owner,
+          company,
+          contactName,
+          value: numericValue,
+          rawBudget,
           priority,
           isWon: won,
           isLost: lost,
           isHot: hot,
           isWarm: warm,
-          date: lead.expectedCloseDate || lead.expected_close_date || lead.createdAt || '',
+          isMomOnly,
+          date,
+          leadData: lead,
+          momData: mom,
+          customerData: customer
         };
       })
       .filter(item => {
-        if (!item.date) return false;
+        if (!item.date) return true;
         const d = new Date(item.date);
         return !isNaN(d.getTime()) && 
                d.getFullYear() === selectedDate.getFullYear() && 
                d.getMonth() === selectedDate.getMonth();
       });
-  }, [allLeads, userNameMap, selectedDate]);
+  }, [unifiedLeads, userNameMap, allUsers, selectedDate]);
 
   // Subset filters
   const hotLeads = useMemo(() => mappedLeads.filter(l => l.isHot && !l.isWon && !l.isLost), [mappedLeads]);
@@ -591,20 +782,32 @@ export default function ChiefAdminLeadsDashboard() {
       });
     }
 
-    const list = extractList(allLeads);
-    const filteredLeads = list.filter(lead => {
-      const assigned = lead.assignedTo || lead.userId || lead.user_id || lead.salesmanId;
-      const ownerId = String(assigned || '');
-      const ownerName = userNameMap[ownerId] || 'Unknown Owner';
-
-      if (selectedRep !== 'All Team Members') {
-        return ownerName.toLowerCase() === selectedRep.toLowerCase();
+    unifiedLeads.forEach(({ lead, mom, customer }) => {
+      const pitch = mom?.pitch_details || {};
+      const ownerId = String(
+        lead?.assignedTo || lead?.userId || lead?.user_id || lead?.createdBy || lead?.salesmanId ||
+        mom?.userId || mom?.user_id || mom?.createdBy || mom?.assignedTo ||
+        customer?.userId || customer?.user_id || customer?.assignedTo || ''
+      );
+      const pitchedByWhom = pitch?.pitched_by_whom || mom?.competition_and_history?.pitched_by_whom || mom?.pitchedByWhom || mom?.pitched_by_whom || customer?.salesPerson || customer?.contactPersonName || '';
+      let owner = userNameMap[ownerId];
+      if (!owner && pitchedByWhom) {
+        const matchedUser = allUsers.find(u => {
+          const f = u.firstName || u.firstname || u.first_name || '';
+          const l = u.lastName || u.lastname || u.last_name || '';
+          const fn = `${f} ${l}`.trim() || u.fullName || u.username || u.email || '';
+          return fn.toLowerCase() === pitchedByWhom.trim().toLowerCase();
+        });
+        owner = matchedUser ? (userNameMap[String(matchedUser.id || matchedUser.userId || matchedUser.user_id)] || pitchedByWhom) : pitchedByWhom;
       }
-      return true;
-    });
+      if (!owner) owner = lead?.ownerName || lead?.owner || 'Unassigned';
 
-    filteredLeads.forEach(lead => {
-      const dateStr = lead.expectedCloseDate || lead.expected_close_date || lead.createdAt;
+      if (selectedRep !== 'All Team Members' && owner.toLowerCase() !== selectedRep.toLowerCase()) {
+        return;
+      }
+
+      const outcome = mom?.outcome || {};
+      const dateStr = lead?.expectedCloseDate || lead?.expected_close_date || outcome?.follow_up_date || mom?.follow_up_date || mom?.meetingDate || mom?.createdAt || lead?.createdAt || '';
       if (!dateStr) return;
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return;
@@ -613,7 +816,7 @@ export default function ChiefAdminLeadsDashboard() {
 
       const match = months.find(m => m.year === leadYear && m.monthIndex === leadMonth);
       if (match) {
-        const valStr = lead.dealValue || lead.deal_value || lead.value || lead.budget;
+        const valStr = lead?.dealValue || lead?.deal_value || lead?.value || lead?.budget || pitch?.budget || mom?.budget || mom?.dealValue || 0;
         match.value += parseDealValue(valStr);
       }
     });
@@ -625,7 +828,7 @@ export default function ChiefAdminLeadsDashboard() {
     });
 
     return months;
-  }, [allLeads, selectedDate, selectedRep, userNameMap]);
+  }, [unifiedLeads, selectedDate, selectedRep, userNameMap, allUsers]);
 
   // Targets Metrics progress calculations
   const targetMetrics = useMemo(() => {
