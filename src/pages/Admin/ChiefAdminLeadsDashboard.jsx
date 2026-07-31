@@ -147,16 +147,42 @@ export default function ChiefAdminLeadsDashboard() {
   const roleDropdownRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date()); // Holds Date object for current Month/Year
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  const calendarModalRef = useRef(null);
+  const monthInputRef = useRef(null);
+
+  const MONTHS_LIST = [
+    { short: 'Jan', full: 'January', index: 0 },
+    { short: 'Feb', full: 'February', index: 1 },
+    { short: 'Mar', full: 'March', index: 2 },
+    { short: 'Apr', full: 'April', index: 3 },
+    { short: 'May', full: 'May', index: 4 },
+    { short: 'Jun', full: 'June', index: 5 },
+    { short: 'Jul', full: 'July', index: 6 },
+    { short: 'Aug', full: 'August', index: 7 },
+    { short: 'Sep', full: 'September', index: 8 },
+    { short: 'Oct', full: 'October', index: 9 },
+    { short: 'Nov', full: 'November', index: 10 },
+    { short: 'Dec', full: 'December', index: 11 },
+  ];
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target)) {
         setIsRoleDropdownOpen(false);
       }
+      if (calendarModalRef.current && !calendarModalRef.current.contains(e.target)) {
+        setIsCalendarOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setPickerYear(selectedDate.getFullYear());
+  }, [selectedDate]);
 
   const handlePillClick = (roleType) => {
     if (selectedRoleFilter === roleType) {
@@ -531,6 +557,17 @@ export default function ChiefAdminLeadsDashboard() {
       })
       .filter(item => {
         if (!item.date) return true;
+        if (typeof item.date === 'string' && item.date.includes('-')) {
+          const cleanStr = item.date.split('T')[0].trim();
+          const parts = cleanStr.split('-');
+          if (parts.length >= 2) {
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            if (!isNaN(year) && !isNaN(month)) {
+              return year === selectedDate.getFullYear() && month === selectedDate.getMonth();
+            }
+          }
+        }
         const d = new Date(item.date);
         return !isNaN(d.getTime()) && 
                d.getFullYear() === selectedDate.getFullYear() && 
@@ -1184,40 +1221,242 @@ export default function ChiefAdminLeadsDashboard() {
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
           </button>
           
-          <div className="date-picker-group" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <button className="btn btn-secondary" style={{ padding: '10px 14px', border: 'none', background: 'transparent' }} onClick={handlePrevMonth}>
-              <ChevronLeft size={16} />
-            </button>
-            
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <Calendar size={15} style={{ position: 'absolute', left: '12px', color: '#94a3b8', pointerEvents: 'none' }} />
-              <input 
-                type="month" 
-                className="input-field"
-                style={{ 
-                  background: 'transparent', 
-                  border: 'none', 
-                  paddingLeft: '34px', 
-                  color: '#fff', 
-                  width: '180px',
+          <div className={`relative ${isCalendarOpen ? 'z-[100]' : 'z-20'}`} ref={calendarModalRef}>
+            <div className="date-picker-group" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ padding: '9px 12px', border: 'none', background: 'transparent', cursor: 'pointer' }} 
+                onClick={handlePrevMonth}
+                title="Previous Month"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              
+              <button
+                onClick={() => setIsCalendarOpen((prev) => !prev)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '6px 12px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  height: '38px',
                   cursor: 'pointer'
                 }}
-                value={getYearMonthString(selectedDate)}
-                onChange={(e) => {
-                  const [y, m] = e.target.value.split('-');
-                  if (y && m) {
-                    setSelectedDate(new Date(parseInt(y), parseInt(m) - 1, 1));
-                  }
-                }}
-              />
+                title="Open Calendar Month Picker Modal"
+              >
+                <Calendar size={15} style={{ color: '#60a5fa' }} />
+                <span>{getYearMonthString(selectedDate)}</span>
+                <ChevronDown size={14} style={{ color: '#94a3b8', transform: isCalendarOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              <button 
+                className="btn btn-secondary" 
+                style={{ padding: '9px 12px', border: 'none', background: 'transparent', cursor: 'pointer' }} 
+                onClick={handleNextMonth}
+                title="Next Month"
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
 
-            <button className="btn btn-secondary" style={{ padding: '10px 14px', border: 'none', background: 'transparent' }} onClick={handleNextMonth}>
-              <ChevronRight size={16} />
-            </button>
+            {/* Hidden native input for OS calendar picker fallback */}
+            <input 
+              ref={monthInputRef}
+              type="month"
+              style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+              value={getYearMonthString(selectedDate)}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split('-');
+                if (y && m) {
+                  setSelectedDate(new Date(parseInt(y), parseInt(m) - 1, 1));
+                  setIsCalendarOpen(false);
+                }
+              }}
+            />
+
+            {/* CALENDAR MONTH PICKER MODAL POPUP */}
+            {isCalendarOpen && (
+              <div 
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: '8px',
+                  width: '320px',
+                  backgroundColor: '#0a101f',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  borderRadius: '16px',
+                  boxShadow: '0 25px 60px rgba(0, 0, 0, 0.95), 0 0 25px rgba(59, 130, 246, 0.2)',
+                  padding: '16px',
+                  zIndex: 9999
+                }}
+              >
+                {/* Modal Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                    <Calendar size={16} style={{ color: '#60a5fa' }} />
+                    <span style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#e2e8f0' }}>Select Period</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const now = new Date();
+                      setSelectedDate(new Date(now.getFullYear(), now.getMonth(), 1));
+                      setPickerYear(now.getFullYear());
+                      setIsCalendarOpen(false);
+                    }}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      color: '#60a5fa',
+                      background: 'rgba(59, 130, 246, 0.12)',
+                      border: '1px solid rgba(59, 130, 246, 0.25)',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Current Month
+                  </button>
+                </div>
+
+                {/* Year Navigation Bar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '12px 0', padding: '0 4px' }}>
+                  <button
+                    onClick={() => setPickerYear(prev => prev - 1)}
+                    style={{ background: 'transparent', border: 'none', color: '#94a3b8', padding: '6px', cursor: 'pointer', borderRadius: '8px' }}
+                    title="Previous Year"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span style={{ fontSize: '16px', fontWeight: '800', color: '#fff', letterSpacing: '0.03em' }}>{pickerYear}</span>
+                  <button
+                    onClick={() => setPickerYear(prev => prev + 1)}
+                    style={{ background: 'transparent', border: 'none', color: '#94a3b8', padding: '6px', cursor: 'pointer', borderRadius: '8px' }}
+                    title="Next Year"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                {/* 12 Months Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', margin: '12px 0' }}>
+                  {MONTHS_LIST.map((m) => {
+                    const isSelected = selectedDate.getFullYear() === pickerYear && selectedDate.getMonth() === m.index;
+                    const isCurrentRealMonth = new Date().getFullYear() === pickerYear && new Date().getMonth() === m.index;
+
+                    return (
+                      <button
+                        key={m.short}
+                        onClick={() => {
+                          setSelectedDate(new Date(pickerYear, m.index, 1));
+                          setIsCalendarOpen(false);
+                        }}
+                        style={{
+                          padding: '8px 4px',
+                          borderRadius: '10px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'all 0.2s',
+                          background: isSelected 
+                            ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                            : 'rgba(15, 23, 42, 0.6)',
+                          color: isSelected ? '#ffffff' : '#cbd5e1',
+                          border: isSelected ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.05)',
+                          boxShadow: isSelected ? '0 4px 12px rgba(37, 99, 235, 0.4)' : 'none'
+                        }}
+                      >
+                        {m.short}
+                        {isCurrentRealMonth && !isSelected && (
+                          <span 
+                            style={{
+                              position: 'absolute',
+                              top: '4px',
+                              right: '4px',
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: '#34d399'
+                            }} 
+                            title="Current Month" 
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Quick Presets Footer */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={() => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() - 1);
+                      setSelectedDate(new Date(d.getFullYear(), d.getMonth(), 1));
+                      setIsCalendarOpen(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      color: '#94a3b8',
+                      background: 'rgba(15, 23, 42, 0.4)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      padding: '6px 4px',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Last Month
+                  </button>
+                  <button
+                    onClick={() => {
+                      const now = new Date();
+                      setSelectedDate(new Date(now.getFullYear(), now.getMonth(), 1));
+                      setIsCalendarOpen(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      color: '#94a3b8',
+                      background: 'rgba(15, 23, 42, 0.4)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      padding: '6px 4px',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    This Month
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (monthInputRef.current?.showPicker) {
+                        monthInputRef.current.showPicker();
+                      }
+                    }}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      color: '#60a5fa',
+                      background: 'rgba(59, 130, 246, 0.12)',
+                      border: '1px solid rgba(59, 130, 246, 0.25)',
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                    title="Open Native OS Month Picker"
+                  >
+                    Native
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1371,7 +1610,7 @@ export default function ChiefAdminLeadsDashboard() {
                   <p className="text-muted" style={{ fontSize: '13px', fontWeight: '600' }}>Filter Overview By Representative:</p>
                   
                   {/* Role Category Toggle Pills with Interactive Dropdown */}
-                  <div className="relative z-50" ref={roleDropdownRef}>
+                  <div className={`relative ${isRoleDropdownOpen ? 'z-50' : 'z-10'}`} ref={roleDropdownRef}>
                     <div className="flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-white/5">
                       <button
                         onClick={() => handlePillClick('ALL')}
