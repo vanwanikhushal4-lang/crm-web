@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -113,8 +113,31 @@ export default function ChiefAdminLeadsDashboard() {
   const [activeTab, setActiveTab] = useState('DASHBOARD'); // 'DASHBOARD' | 'HOT' | 'WARM'
   const [selectedRep, setSelectedRep] = useState('All Team Members');
   const [listRepFilter, setListRepFilter] = useState('ALL');
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL'); // 'ALL' | 'SALES_MANAGER' | 'OUTSIDER'
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [roleSearchQuery, setRoleSearchQuery] = useState('');
+  const roleDropdownRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date()); // Holds Date object for current Month/Year
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target)) {
+        setIsRoleDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handlePillClick = (roleType) => {
+    if (selectedRoleFilter === roleType) {
+      setIsRoleDropdownOpen((prev) => !prev);
+    } else {
+      setSelectedRoleFilter(roleType);
+      setIsRoleDropdownOpen(true);
+    }
+  };
   
   // Data State
   const [allLeads, setAllLeads] = useState([]);
@@ -197,8 +220,6 @@ export default function ChiefAdminLeadsDashboard() {
     }, 0);
     return () => clearTimeout(timer);
   }, []);
-
-  const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL'); // 'ALL', 'SALES_MANAGER', 'OUTSIDER'
 
   // Helper to map and resolve User IDs to human-readable names
   const getUserName = (userId) => {
@@ -365,6 +386,34 @@ export default function ChiefAdminLeadsDashboard() {
 
     return ['All Team Members', ...filteredList.sort()];
   }, [mappedLeads, selectedRoleFilter, allUsers]);
+
+  const salesManagerRepsList = useMemo(() => {
+    const names = Array.from(new Set(mappedLeads.map((l) => l.owner).filter(Boolean)));
+    return names.filter((name) => getUserRole(name) === 'Sales Manager').map((name) => ({ name, role: 'Sales Manager' }));
+  }, [mappedLeads, allUsers]);
+
+  const outsiderRepsList = useMemo(() => {
+    const names = Array.from(new Set(mappedLeads.map((l) => l.owner).filter(Boolean)));
+    return names.filter((name) => getUserRole(name) === 'Outsider').map((name) => ({ name, role: 'Outsider' }));
+  }, [mappedLeads, allUsers]);
+
+  const filteredDropdownList = useMemo(() => {
+    let list = [];
+    if (selectedRoleFilter === 'SALES_MANAGER') {
+      list = salesManagerRepsList;
+    } else if (selectedRoleFilter === 'OUTSIDER') {
+      list = outsiderRepsList;
+    } else {
+      const names = Array.from(new Set(mappedLeads.map((l) => l.owner).filter(Boolean)));
+      list = names.map((name) => ({ name, role: getUserRole(name) }));
+    }
+
+    if (roleSearchQuery.trim()) {
+      const q = roleSearchQuery.toLowerCase();
+      list = list.filter((m) => m.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [selectedRoleFilter, salesManagerRepsList, outsiderRepsList, mappedLeads, allUsers, roleSearchQuery]);
 
   // 5. Ownership breakdown (Group by owner to show individual summaries)
   const ownershipSummary = useMemo(() => {
@@ -1118,38 +1167,122 @@ export default function ChiefAdminLeadsDashboard() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-muted" style={{ fontSize: '13px', fontWeight: '600' }}>Filter Overview By Representative:</p>
                   
-                  {/* Role Category Toggle Pills */}
-                  <div className="flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-white/5">
-                    <button
-                      onClick={() => setSelectedRoleFilter('ALL')}
-                      className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                        selectedRoleFilter === 'ALL'
-                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                          : 'text-slate-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      All Roles
-                    </button>
-                    <button
-                      onClick={() => setSelectedRoleFilter('SALES_MANAGER')}
-                      className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                        selectedRoleFilter === 'SALES_MANAGER'
-                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                          : 'text-slate-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      Sales Managers
-                    </button>
-                    <button
-                      onClick={() => setSelectedRoleFilter('OUTSIDER')}
-                      className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                        selectedRoleFilter === 'OUTSIDER'
-                          ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-                          : 'text-slate-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      Outsiders
-                    </button>
+                  {/* Role Category Toggle Pills with Interactive Dropdown */}
+                  <div className="relative z-50" ref={roleDropdownRef}>
+                    <div className="flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-white/5">
+                      <button
+                        onClick={() => handlePillClick('ALL')}
+                        className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                          selectedRoleFilter === 'ALL'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <span>All Roles</span>
+                        <ChevronDown className={`h-3 w-3 transition-transform ${selectedRoleFilter === 'ALL' && isRoleDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      <button
+                        onClick={() => handlePillClick('SALES_MANAGER')}
+                        className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                          selectedRoleFilter === 'SALES_MANAGER'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <span>Sales Managers ({salesManagerRepsList.length})</span>
+                        <ChevronDown className={`h-3 w-3 transition-transform ${selectedRoleFilter === 'SALES_MANAGER' && isRoleDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      <button
+                        onClick={() => handlePillClick('OUTSIDER')}
+                        className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                          selectedRoleFilter === 'OUTSIDER'
+                            ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <span>Outsiders ({outsiderRepsList.length})</span>
+                        <ChevronDown className={`h-3 w-3 transition-transform ${selectedRoleFilter === 'OUTSIDER' && isRoleDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+
+                    {/* Dropdown Popover Panel */}
+                    {isRoleDropdownOpen && (
+                      <div className="absolute right-0 top-full mt-2 z-[9999] w-72 md:w-80 rounded-2xl bg-[#0c1427] border border-white/15 shadow-2xl p-3.5 backdrop-blur-2xl animate-fade">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/5 px-1">
+                          <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5 text-blue-400" />
+                            {selectedRoleFilter === 'SALES_MANAGER'
+                              ? `Sales Managers (${salesManagerRepsList.length})`
+                              : selectedRoleFilter === 'OUTSIDER'
+                              ? `Outsiders (${outsiderRepsList.length})`
+                              : 'All Representatives'}
+                          </span>
+                          <button
+                            onClick={() => setIsRoleDropdownOpen(false)}
+                            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        {/* Quick Search */}
+                        <div className="relative mb-2">
+                          <Search className="h-3.5 w-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+                          <input
+                            type="text"
+                            placeholder="Filter by name..."
+                            value={roleSearchQuery}
+                            onChange={(e) => setRoleSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-900/80 border border-white/10 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+
+                        {/* Representative List */}
+                        <div className="max-h-60 overflow-y-auto hide-scrollbar flex flex-col gap-1.5 pr-1">
+                          {filteredDropdownList.length === 0 ? (
+                            <div className="py-6 text-center text-xs text-slate-500">No matching representatives found.</div>
+                          ) : (
+                            filteredDropdownList.map((m) => {
+                              const isSelected = selectedRep === m.name;
+                              return (
+                                <button
+                                  key={m.name}
+                                  onClick={() => {
+                                    setSelectedRep(m.name);
+                                    setIsRoleDropdownOpen(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
+                                    isSelected
+                                      ? 'bg-blue-600/20 border-blue-500/50 text-white font-semibold'
+                                      : 'bg-slate-900/40 border-white/5 text-slate-300 hover:bg-white/5 hover:border-white/10'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${
+                                      m.role === 'Outsider'
+                                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                        : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                    }`}>
+                                      {m.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <div className="text-xs font-semibold text-slate-100">{m.name}</div>
+                                      {m.role && (
+                                        <span className={`text-[10px] font-bold ${m.role === 'Outsider' ? 'text-purple-400' : 'text-blue-400'}`}>
+                                          {m.role}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {isSelected && <CheckCircle2 className="h-4 w-4 text-blue-400 shrink-0" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
