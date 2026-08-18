@@ -19,7 +19,11 @@ import {
   MapPin,
   Tag,
   Table,
-  Calendar
+  Calendar,
+  Upload,
+  FileSpreadsheet,
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 
 
@@ -32,7 +36,9 @@ import {
   getDesignations,
   saveOrUpdateLead,
   createNewDesignation,
-  saveMoMDetailsOfCustomer
+  saveMoMDetailsOfCustomer,
+  importLeadsExcel,
+  deleteLeadById
 } from '../../api/apiFunctions/Login/Login_api_function';
 import RunningNumber from '../common/RunningNumber';
 
@@ -212,9 +218,86 @@ export default function PipelineTab() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showMomModal, setShowMomModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showImportExcelModal, setShowImportExcelModal] = useState(false);
+  const [excelFile, setExcelFile] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
   const [tempSelectedStage, setTempSelectedStage] = useState(null);
   const [followUpDate, setFollowUpDate] = useState('');
+
+  const handleImportSubmit = async () => {
+    if (!excelFile) return;
+    setIsImporting(true);
+    setImportStatus(null);
+    try {
+      const response = await importLeadsExcel(excelFile);
+      setImportStatus({
+        type: 'success',
+        message: response?.message || response?.data?.message || 'Leads imported successfully from Excel!'
+      });
+      fetchPipelineData();
+      setTimeout(() => {
+        setShowImportExcelModal(false);
+        setExcelFile(null);
+        setImportStatus(null);
+      }, 1800);
+    } catch (err) {
+      console.error('Failed to import leads Excel:', err);
+      setImportStatus({
+        type: 'error',
+        message: err?.response?.data?.message || err?.message || 'Failed to import Excel file. Please check format and try again.'
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Custom Alert/Confirm & Toast state
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toastNotification, setToastNotification] = useState(null);
+
+  const showToast = (type, message) => {
+    setToastNotification({ type, message });
+    setTimeout(() => {
+      setToastNotification(null);
+    }, 4000);
+  };
+
+  const handleDeleteLead = (lead) => {
+    const targetId = lead?.leadId || lead?.id || (typeof lead === 'number' || typeof lead === 'string' ? lead : null);
+    if (!targetId) {
+      showToast('error', 'Unable to identify lead ID to delete.');
+      return;
+    }
+    setDeleteTarget(lead);
+  };
+
+  const confirmDeleteLead = async () => {
+    if (!deleteTarget) return;
+    const targetId = deleteTarget?.leadId || deleteTarget?.id || (typeof deleteTarget === 'number' || typeof deleteTarget === 'string' ? deleteTarget : null);
+    if (!targetId) {
+      showToast('error', 'Unable to identify lead ID to delete.');
+      setDeleteTarget(null);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteLeadById(targetId);
+      showToast('success', `Lead "${deleteTarget?.company || deleteTarget?.companyName || 'Opportunity'}" deleted successfully!`);
+      if (showCloseModal) setShowCloseModal(false);
+      if (showDetailsModal) setShowDetailsModal(false);
+      setDeleteTarget(null);
+      fetchPipelineData();
+    } catch (err) {
+      console.error('Delete Lead Error:', err);
+      showToast('error', err?.response?.data?.message || err?.message || 'Failed to delete lead. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const [momForm, setMomForm] = useState({
     productsPitched: [],
@@ -1034,6 +1117,15 @@ export default function PipelineTab() {
             <Download className="h-4 w-4" />
             Export CSV
           </button>
+
+          <button
+            onClick={() => setShowImportExcelModal(true)}
+            className="px-4 py-2 bg-emerald-950/60 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow"
+            title="Import Leads from Excel file"
+          >
+            <Upload className="h-4 w-4" />
+            Import Excel
+          </button>
           
           <button
             onClick={() => setShowCreateModal(true)}
@@ -1347,7 +1439,7 @@ export default function PipelineTab() {
                       </span>
                     </td>
                     <td className="py-4 px-5">
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-2 justify-end items-center">
                         {lead.leadId ? (
                           <button
                             onClick={() => handleCloseLead(lead)}
@@ -1363,6 +1455,13 @@ export default function PipelineTab() {
                             Edit MOM Detail
                           </button>
                         )}
+                        <button
+                          onClick={() => handleDeleteLead(lead)}
+                          className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                          title="Delete Lead"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1480,7 +1579,14 @@ export default function PipelineTab() {
                       </div>
 
                       {/* Expand Actions list */}
-                      <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-white/5 w-full">
+                      <div className="flex gap-2 justify-end items-center mt-2 pt-2 border-t border-white/5 w-full">
+                        <button
+                          onClick={() => handleDeleteLead(lead)}
+                          className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete Lead
+                        </button>
                         {lead.leadId ? (
                           <button
                             onClick={() => handleCloseLead(lead)}
@@ -2295,6 +2401,217 @@ export default function PipelineTab() {
                 SUBMIT MOM DETAILS
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT LEADS EXCEL MODAL */}
+      {showImportExcelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade">
+          <div className="bg-[#0b1329] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 text-slate-100">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                  <FileSpreadsheet className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Import Leads from Excel</h2>
+                  <p className="text-xs text-slate-400">Upload .xlsx, .xls or .csv batch file</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowImportExcelModal(false);
+                  setExcelFile(null);
+                  setImportStatus(null);
+                }}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* File Dropzone */}
+            <div className="space-y-3">
+              <label className="block text-xs font-medium text-slate-300">Select File</label>
+              <div className="relative border-2 border-dashed border-slate-700 hover:border-emerald-500/50 bg-slate-900/50 hover:bg-slate-900 rounded-xl p-6 text-center cursor-pointer transition">
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setExcelFile(file);
+                      setImportStatus(null);
+                    }
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                <div className="flex flex-col items-center gap-2">
+                  <Upload className="h-8 w-8 text-emerald-400 animate-pulse" />
+                  {excelFile ? (
+                    <div className="text-xs font-semibold text-emerald-300 bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-500/30 truncate max-w-[280px]">
+                      📄 {excelFile.name} ({(excelFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs font-semibold text-slate-200">
+                        Click to browse or drag & drop file
+                      </p>
+                      <p className="text-[10px] text-slate-500">Supports .xlsx, .xls, and .csv files</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Status Feedback */}
+            {importStatus && (
+              <div
+                className={`p-3 rounded-xl text-xs flex items-start gap-2 border ${
+                  importStatus.type === 'success'
+                    ? 'bg-emerald-950/50 border-emerald-500/30 text-emerald-200'
+                    : 'bg-rose-950/50 border-rose-500/30 text-rose-200'
+                }`}
+              >
+                {importStatus.type === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                )}
+                <span>{importStatus.message}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportExcelModal(false);
+                  setExcelFile(null);
+                  setImportStatus(null);
+                }}
+                disabled={isImporting}
+                className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleImportSubmit}
+                disabled={!excelFile || isImporting}
+                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Upload & Import
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING TOAST NOTIFICATION */}
+      {toastNotification && (
+        <div className="fixed top-6 right-6 z-[100] animate-bounce-short">
+          <div
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border shadow-xl backdrop-blur-md text-xs font-medium ${
+              toastNotification.type === 'success'
+                ? 'bg-[#0d182b]/95 border-emerald-500/30 text-slate-200'
+                : 'bg-[#180e15]/95 border-rose-500/30 text-slate-200'
+            }`}
+          >
+            {toastNotification.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+            )}
+            <span>{toastNotification.message}</span>
+            <button
+              onClick={() => setToastNotification(null)}
+              className="ml-2 p-1 hover:bg-white/10 rounded-lg transition text-slate-400 hover:text-white"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM DELETE LEAD CONFIRMATION MODAL */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade">
+          <div className="bg-[#0b1329] border border-white/10 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4 text-slate-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-900 border border-white/10 rounded-xl text-slate-300">
+                  <Trash2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Delete Lead</h3>
+                  <p className="text-[11px] text-slate-400">ID: {deleteTarget?.leadId || deleteTarget?.id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to delete <span className="font-semibold text-white">{deleteTarget?.company || deleteTarget?.companyName || 'this lead'}</span>? This action cannot be undone.
+            </p>
+
+            {/* Warning Note */}
+            <div className="bg-slate-900/60 border border-white/5 rounded-xl p-3 text-[11px] text-slate-400 flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-400/80 shrink-0" />
+              <span>All associated history for this lead will be permanently removed.</span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-900 border border-slate-800 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteLead}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-medium text-white bg-red-600/90 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition flex items-center gap-1.5 shadow"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader className="h-3.5 w-3.5 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Lead
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

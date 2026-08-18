@@ -144,6 +144,41 @@ export const getAllLeads = async () => {
   }
 };
 
+export const importLeadsExcel = async (fileOrFormData) => {
+  try {
+    let formData;
+    if (fileOrFormData instanceof FormData) {
+      formData = fileOrFormData;
+    } else {
+      formData = new FormData();
+      formData.append('file', fileOrFormData);
+    }
+    const res = await apiMethods.post('/lead/importLeadsExcel', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res;
+  } catch (error) {
+    console.error('Import Leads Excel API Error:', error);
+    throw error;
+  }
+};
+
+export const deleteLeadById = async (id) => {
+  try {
+    const res = await apiMethods.delete(`/lead/deleteById/${id}`);
+    return res;
+  } catch (error) {
+    if (error?.response?.status === 405) {
+      const res = await apiMethods.post(`/lead/deleteById/${id}`);
+      return res;
+    }
+    console.error('Delete Lead By ID API Error:', error);
+    throw error;
+  }
+};
+
 export const saveOrUpdateTaskLog = async (payload) => {
   try {
     const res = await apiMethods.post('/TaskLog/saveOrUpdateTaskLog', payload);
