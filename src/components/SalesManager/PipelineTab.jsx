@@ -23,8 +23,7 @@ import {
   Upload,
   FileSpreadsheet,
   CheckCircle2,
-  Trash2,
-  Edit3
+  Trash2
 } from 'lucide-react';
 
 
@@ -317,8 +316,6 @@ export default function PipelineTab() {
 
   // Form states
   const [leadForm, setLeadForm] = useState({
-    id: null,
-    customerId: null,
     company: '',
     product: [], // array of selected product labels
     industry: '',
@@ -330,7 +327,6 @@ export default function PipelineTab() {
     stage: 'NEW_LEAD',
     dealValue: '',
     partner: '',
-    distributor: '',
     leadSource: 'DIRECT',
     expectedCloseDate: '',
     priority: 'WARM',
@@ -338,80 +334,6 @@ export default function PipelineTab() {
     address: '',
     customerType: 'Customer'
   });
-
-  const openAddLeadModal = () => {
-    setLeadForm({
-      id: null,
-      customerId: null,
-      company: '',
-      product: [],
-      industry: '',
-      city: '',
-      contactName: '',
-      designation: '',
-      email: '',
-      phone: '',
-      stage: 'NEW_LEAD',
-      dealValue: '',
-      partner: '',
-      distributor: '',
-      leadSource: 'DIRECT',
-      expectedCloseDate: '',
-      priority: 'WARM',
-      notes: '',
-      address: '',
-      customerType: 'Customer'
-    });
-    setCompanySearch('');
-    setContactSearch('');
-    setSuggestedCompanies([]);
-    setSuggestedContacts([]);
-    setShowCreateModal(true);
-  };
-
-  const openEditLeadModal = (leadItem) => {
-    const raw = leadItem?.leadData || leadItem || {};
-    let productArr = [];
-    if (Array.isArray(raw.product)) {
-      productArr = raw.product;
-    } else if (typeof raw.product === 'string' && raw.product.trim()) {
-      productArr = raw.product.split(',').map((p) => p.trim());
-    } else if (leadItem?.product) {
-      productArr = typeof leadItem.product === 'string' ? leadItem.product.split(',').map((p) => p.trim()) : [];
-    }
-
-    const leadIdVal = raw.id || leadItem?.leadId || (typeof leadItem?.id === 'number' || (typeof leadItem?.id === 'string' && !leadItem.id.includes('-')) ? leadItem.id : null);
-    const customerIdVal = raw.customerId || leadItem?.customerId || null;
-
-    setLeadForm({
-      id: leadIdVal,
-      customerId: customerIdVal,
-      company: raw.company || leadItem?.company || '',
-      contactName: raw.contactName || leadItem?.contactName || '',
-      email: raw.email || leadItem?.email || '',
-      phone: raw.phone || leadItem?.phone || '',
-      designation: raw.designation || leadItem?.designation || '',
-      industry: raw.industry || leadItem?.industry || '',
-      city: raw.city || leadItem?.city || '',
-      stage: raw.stage || leadItem?.stage || 'NEW_LEAD',
-      dealValue: raw.dealValue !== undefined && raw.dealValue !== null ? String(raw.dealValue) : (leadItem?.dealValue !== undefined ? String(leadItem.dealValue) : ''),
-      partner: raw.partner || leadItem?.partner || '',
-      distributor: raw.distributor || leadItem?.distributor || '',
-      leadSource: raw.leadSource || leadItem?.leadSource || 'DIRECT',
-      expectedCloseDate: raw.expectedCloseDate || leadItem?.expectedCloseDate || '',
-      priority: raw.priority || leadItem?.priority || 'WARM',
-      product: productArr,
-      address: raw.address || leadItem?.address || '',
-      customerType: raw.customerType || leadItem?.customerType || 'Customer',
-      notes: raw.notes || leadItem?.notes || ''
-    });
-
-    setCompanySearch(raw.company || leadItem?.company || '');
-    setContactSearch(raw.contactName || leadItem?.contactName || '');
-    setSuggestedCompanies([]);
-    setSuggestedContacts([]);
-    setShowCreateModal(true);
-  };
 
   const [momNotes, setMomNotes] = useState('');
 
@@ -780,51 +702,20 @@ export default function PipelineTab() {
   const handleSaveLead = async (e) => {
     e.preventDefault();
     try {
-      setIsLoading(true);
       const payload = {
         ...leadForm,
-        company: companySearch || leadForm.company,
-        contactName: contactSearch || leadForm.contactName,
         product: Array.isArray(leadForm.product) ? leadForm.product.join(', ') : leadForm.product
       };
-
-      if (!payload.id) delete payload.id;
-      if (!payload.customerId) delete payload.customerId;
-
       await saveOrUpdateLead(payload);
-      showToast('success', leadForm.id ? 'Lead updated successfully!' : 'Lead opportunity saved successfully!');
+      alert('Lead opportunity saved successfully!');
       setShowCreateModal(false);
-      setLeadForm({
-        id: null,
-        customerId: null,
-        company: '',
-        product: [],
-        industry: '',
-        city: '',
-        contactName: '',
-        designation: '',
-        email: '',
-        phone: '',
-        stage: 'NEW_LEAD',
-        dealValue: '',
-        partner: '',
-        distributor: '',
-        leadSource: 'DIRECT',
-        expectedCloseDate: '',
-        priority: 'WARM',
-        notes: '',
-        address: '',
-        customerType: 'Customer'
-      });
+      // Reset form
+      setLeadForm({ company: '', product: [], industry: '', city: '', contactName: '', designation: '', email: '', phone: '', stage: 'NEW_LEAD', dealValue: '', partner: '', leadSource: 'DIRECT', expectedCloseDate: '', priority: 'WARM', notes: '', address: '', customerType: 'Customer' });
       setCompanySearch('');
       setContactSearch('');
-      setSuggestedCompanies([]);
-      setSuggestedContacts([]);
       fetchPipelineData();
     } catch (error) {
-      showToast('error', 'Error saving lead: ' + (error?.response?.data?.message || error.message));
-    } finally {
-      setIsLoading(false);
+      alert('Error saving lead: ' + (error?.response?.data?.message || error.message));
     }
   };
 
@@ -1237,7 +1128,7 @@ export default function PipelineTab() {
           </button>
           
           <button
-            onClick={openAddLeadModal}
+            onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg"
           >
             <Plus className="h-4 w-4" />
@@ -1549,14 +1440,6 @@ export default function PipelineTab() {
                     </td>
                     <td className="py-4 px-5">
                       <div className="flex gap-2 justify-end items-center">
-                        <button
-                          onClick={() => openEditLeadModal(lead)}
-                          className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/20 rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
-                          title="Edit Lead Details"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          Edit
-                        </button>
                         {lead.leadId ? (
                           <button
                             onClick={() => handleCloseLead(lead)}
@@ -1698,13 +1581,6 @@ export default function PipelineTab() {
                       {/* Expand Actions list */}
                       <div className="flex gap-2 justify-end items-center mt-2 pt-2 border-t border-white/5 w-full">
                         <button
-                          onClick={() => openEditLeadModal(lead)}
-                          className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          Edit Lead
-                        </button>
-                        <button
                           onClick={() => handleDeleteLead(lead)}
                           className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow"
                         >
@@ -1749,9 +1625,7 @@ export default function PipelineTab() {
           <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar">
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
-              <h3 className="text-base font-bold text-slate-100">
-                {leadForm.id ? 'Edit Lead Opportunity' : 'Add Pipeline Opportunity'}
-              </h3>
+              <h3 className="text-base font-bold text-slate-100">Add Pipeline Opportunity</h3>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
@@ -1846,88 +1720,49 @@ export default function PipelineTab() {
                 </div>
               </div>
 
-              {/* Designation & Industry */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Designation Role</label>
-                  <div className="flex gap-2">
-                    <select
-                      value={leadForm.designation}
-                      onChange={(e) => setLeadForm({ ...leadForm, designation: e.target.value })}
-                      className="flex-1 px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
-                    >
-                      <option value="">Select Designation...</option>
-                      {designations.map((d, idx) => (
-                        <option key={idx} value={d.name || d}>{d.name || d}</option>
-                      ))}
-                    </select>
-                    
+              {/* Designation Selector */}
+              <div>
+                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Designation Role</label>
+                <div className="flex gap-2">
+                  <select
+                    value={leadForm.designation}
+                    onChange={(e) => setLeadForm({ ...leadForm, designation: e.target.value })}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
+                  >
+                    <option value="">Select Designation...</option>
+                    {designations.map((d, idx) => (
+                      <option key={idx} value={d.name || d}>{d.name || d}</option>
+                    ))}
+                  </select>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowAddDesignationInput(!showAddDesignationInput)}
+                    className="px-3 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 hover:border-blue-500 rounded-lg text-xs font-semibold"
+                  >
+                    New
+                  </button>
+                </div>
+
+                {/* Add Custom Designation Field */}
+                {showAddDesignationInput && (
+                  <div className="flex gap-2 mt-2 p-3 bg-slate-950/40 rounded-xl border border-white/5">
+                    <input
+                      type="text"
+                      placeholder="e.g. Sales Chief"
+                      value={newDesignation}
+                      onChange={(e) => setNewDesignation(e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded bg-slate-900 border border-white/5 text-xs text-slate-100 focus:outline-none"
+                    />
                     <button
                       type="button"
-                      onClick={() => setShowAddDesignationInput(!showAddDesignationInput)}
-                      className="px-3 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 hover:border-blue-500 rounded-lg text-xs font-semibold"
+                      onClick={handleAddDesignation}
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold"
                     >
-                      New
+                      Save
                     </button>
                   </div>
-
-                  {showAddDesignationInput && (
-                    <div className="flex gap-2 mt-2 p-3 bg-slate-950/40 rounded-xl border border-white/5">
-                      <input
-                        type="text"
-                        placeholder="e.g. Sales Chief"
-                        value={newDesignation}
-                        onChange={(e) => setNewDesignation(e.target.value)}
-                        className="flex-1 px-3 py-1.5 rounded bg-slate-900 border border-white/5 text-xs text-slate-100 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddDesignation}
-                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Industry Sector</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Finance, Tech, Healthcare"
-                    value={leadForm.industry}
-                    onChange={(e) => setLeadForm({ ...leadForm, industry: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
-                  />
-                </div>
-              </div>
-
-              {/* City & Customer Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold mb-1.5 block">City</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Mumbai, Delhi"
-                    value={leadForm.city}
-                    onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Customer Type</label>
-                  <select
-                    value={leadForm.customerType}
-                    onChange={(e) => setLeadForm({ ...leadForm, customerType: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
-                  >
-                    <option value="Customer">Customer</option>
-                    <option value="Prospect">Prospect</option>
-                    <option value="Partner">Partner</option>
-                    <option value="Lead">Lead</option>
-                  </select>
-                </div>
+                )}
               </div>
 
               {/* Close Date & Stage */}
@@ -1965,7 +1800,7 @@ export default function PipelineTab() {
                   <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Estimated Deal Value (Cr)</label>
                   <input
                     type="text"
-                    placeholder="e.g. 1.2 or 1200000"
+                    placeholder="e.g. 1.2 or 0.5"
                     value={leadForm.dealValue}
                     onChange={(e) => setLeadForm({ ...leadForm, dealValue: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
@@ -1985,7 +1820,7 @@ export default function PipelineTab() {
                 </div>
               </div>
 
-              {/* Partner Name & Distributor */}
+              {/* Partner Name & Priority */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Partner / Agency name</label>
@@ -1998,29 +1833,17 @@ export default function PipelineTab() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Distributor</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Redington"
-                    value={leadForm.distributor}
-                    onChange={(e) => setLeadForm({ ...leadForm, distributor: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
-                  />
+                  <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Priority</label>
+                  <select
+                    value={leadForm.priority}
+                    onChange={(e) => setLeadForm({ ...leadForm, priority: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
+                  >
+                    <option value="Cold">Cold</option>
+                    <option value="Warm">Warm</option>
+                    <option value="Hot">Hot</option>
+                  </select>
                 </div>
-              </div>
-
-              {/* Priority */}
-              <div>
-                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Priority</label>
-                <select
-                  value={leadForm.priority}
-                  onChange={(e) => setLeadForm({ ...leadForm, priority: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
-                >
-                  <option value="COLD">Cold</option>
-                  <option value="WARM">Warm</option>
-                  <option value="HOT">Hot</option>
-                </select>
               </div>
 
               {/* Pitched Products multi-select checklist */}
@@ -2070,10 +1893,9 @@ export default function PipelineTab() {
 
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-all disabled:opacity-50"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-all"
               >
-                {leadForm.id ? 'UPDATE LEAD DETAILS' : 'SAVE LEAD OPPORTUNITY'}
+                SAVE LEAD OPPORTUNITY
               </button>
 
             </form>
