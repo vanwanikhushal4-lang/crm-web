@@ -225,6 +225,7 @@ export default function PipelineTab() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [tempSelectedStage, setTempSelectedStage] = useState(null);
   const [followUpDate, setFollowUpDate] = useState('');
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('PAYMENT_PENDING');
 
   const handleImportSubmit = async () => {
     if (!excelFile) return;
@@ -332,7 +333,8 @@ export default function PipelineTab() {
     priority: 'WARM',
     notes: '',
     address: '',
-    customerType: 'Customer'
+    customerType: 'Customer',
+    paymentStatus: 'PAYMENT_PENDING'
   });
 
   const [momNotes, setMomNotes] = useState('');
@@ -710,7 +712,7 @@ export default function PipelineTab() {
       alert('Lead opportunity saved successfully!');
       setShowCreateModal(false);
       // Reset form
-      setLeadForm({ company: '', product: [], industry: '', city: '', contactName: '', designation: '', email: '', phone: '', stage: 'NEW_LEAD', dealValue: '', partner: '', leadSource: 'DIRECT', expectedCloseDate: '', priority: 'WARM', notes: '', address: '', customerType: 'Customer' });
+      setLeadForm({ company: '', product: [], industry: '', city: '', contactName: '', designation: '', email: '', phone: '', stage: 'NEW_LEAD', dealValue: '', partner: '', leadSource: 'DIRECT', expectedCloseDate: '', priority: 'WARM', notes: '', address: '', customerType: 'Customer', paymentStatus: 'PAYMENT_PENDING' });
       setCompanySearch('');
       setContactSearch('');
       fetchPipelineData();
@@ -869,13 +871,49 @@ export default function PipelineTab() {
         priority: raw.priority || 'WARM',
         notes: raw.notes || '',
         address: raw.address || '',
-        customerType: raw.customerType || 'Customer'
+        customerType: raw.customerType || 'Customer',
+        paymentStatus: raw.paymentStatus || 'PAYMENT_PENDING'
       };
       await saveOrUpdateLead(payload);
       alert(`Lead stage updated to ${status.replace('_', ' ').toLowerCase()} successfully.`);
       fetchPipelineData();
     } catch (error) {
       alert('Failed to update lead: ' + (error?.response?.data?.message || error.message));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updatePaymentStatus = async (leadItem, paymentStatus) => {
+    try {
+      setIsLoading(true);
+      const raw = leadItem.leadData || {};
+      const payload = {
+        id: leadItem.leadId,
+        company: raw.company || '',
+        product: Array.isArray(raw.product) ? raw.product.join(', ') : raw.product || '',
+        industry: raw.industry || '',
+        city: raw.city || '',
+        contactName: raw.contactName || '',
+        designation: raw.designation || '',
+        email: raw.email || '',
+        phone: raw.phone || '',
+        stage: raw.stage || 'NEW_LEAD',
+        dealValue: raw.dealValue || '',
+        partner: raw.partner || '',
+        leadSource: raw.leadSource || 'DIRECT',
+        expectedCloseDate: raw.expectedCloseDate || '',
+        priority: raw.priority || 'WARM',
+        notes: raw.notes || '',
+        address: raw.address || '',
+        customerType: raw.customerType || 'Customer',
+        paymentStatus: paymentStatus
+      };
+      await saveOrUpdateLead(payload);
+      alert(`Payment status updated to ${paymentStatus.replace('_', ' ')} successfully.`);
+      fetchPipelineData();
+    } catch (error) {
+      alert('Failed to update payment status: ' + (error?.response?.data?.message || error.message));
     } finally {
       setIsLoading(false);
     }
@@ -1794,6 +1832,19 @@ export default function PipelineTab() {
                 </div>
               </div>
 
+              {/* Payment Status */}
+              <div>
+                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Payment Status</label>
+                <select
+                  value={leadForm.paymentStatus}
+                  onChange={(e) => setLeadForm({ ...leadForm, paymentStatus: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
+                >
+                  <option value="PAYMENT_PENDING">Payment Pending</option>
+                  <option value="PAYMENT_COMPLETED">Payment Completed</option>
+                </select>
+              </div>
+
               {/* Deal Value & Source */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -2074,6 +2125,36 @@ export default function PipelineTab() {
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Payment Status Section */}
+                <div className="border-t border-white/5 pt-4 mt-2">
+                  <p className="text-[11px] text-slate-400 mb-2">
+                    Update Payment Status:
+                  </p>
+                  <div className="flex gap-2">
+                    {[
+                      { label: 'Payment Completed', value: 'PAYMENT_COMPLETED', color: 'hover:bg-emerald-600/10 hover:border-emerald-500/20 hover:text-emerald-300 border-white/5 text-slate-400' },
+                      { label: 'Payment Pending', value: 'PAYMENT_PENDING', color: 'hover:bg-amber-600/10 hover:border-amber-500/20 hover:text-amber-300 border-white/5 text-slate-400' },
+                    ].map((paymentStatus) => {
+                      const isCurrent = (selectedLead.leadData?.paymentStatus || 'PAYMENT_PENDING') === paymentStatus.value;
+                      return (
+                        <button
+                          key={paymentStatus.value}
+                          onClick={async () => {
+                            await updatePaymentStatus(selectedLead, paymentStatus.value);
+                          }}
+                          className={`flex-1 py-2.5 px-3 rounded-xl border text-xs font-bold text-left transition-all duration-200 flex items-center justify-center hover:scale-[1.01] active:scale-[0.99] ${
+                          isCurrent
+                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/15'
+                            : `bg-slate-900/40 border-white/5 ${paymentStatus.color}`
+                        }`}
+                        >
+                          <span>{paymentStatus.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </>
             ) : (
