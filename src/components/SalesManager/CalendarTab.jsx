@@ -55,8 +55,13 @@ export default function CalendarTab() {
   const getLocalDatetimeString = (date, hours = 9) => {
     const localDate = new Date(date);
     localDate.setHours(hours, 0, 0, 0);
-    const tzoffset = localDate.getTimezoneOffset() * 60000;
-    return new Date(localDate - tzoffset).toISOString().slice(0, 16);
+    const pad = (n) => String(n).padStart(2, '0');
+    const yyyy = localDate.getFullYear();
+    const MM = pad(localDate.getMonth() + 1);
+    const dd = pad(localDate.getDate());
+    const hh = pad(localDate.getHours());
+    const mm = pad(localDate.getMinutes());
+    return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
   };
 
   const getLocalDateString = (date) => {
@@ -577,6 +582,22 @@ export default function CalendarTab() {
     setSuggestedContacts([]);
   };
 
+  // Helper function to format date to local ISO (YYYY-MM-DDTHH:mm:ss) without timezone conversion
+  const formatToLocalISO = (date) => {
+    if (!date) return '';
+    const d = date instanceof Date ? date : new Date(date);
+    const pad = (n) => String(n).padStart(2, '0');
+
+    const yyyy = d.getFullYear();
+    const MM = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mm = pad(d.getMinutes());
+    const ss = pad(d.getSeconds());
+
+    return `${yyyy}-${MM}-${dd}T${hh}:${mm}:${ss}`;
+  };
+
   // Action submit handlers
   const handleSaveMeeting = async (e) => {
     e.preventDefault();
@@ -585,9 +606,11 @@ export default function CalendarTab() {
         companyName: meetingForm.companyName,
         contactPersonName: meetingForm.contactPersonName,
         locationName: meetingForm.locationName || 'Mumbai Office',
-        startTime: meetingForm.startTime ? new Date(meetingForm.startTime).toISOString() : new Date().toISOString(),
-        endTime: meetingForm.endTime ? new Date(meetingForm.endTime).toISOString() : new Date(Date.now() + 3600000).toISOString()
+        startTime: formatToLocalISO(meetingForm.startTime),
+        endTime: formatToLocalISO(meetingForm.endTime)
       };
+
+      console.log('Saving meeting with payload:', payload);
 
       if (meetingForm.isScheduled) {
         const schedulePayload = {
@@ -610,7 +633,10 @@ export default function CalendarTab() {
       setContactSearch('');
       fetchData();
     } catch (error) {
-      alert('Error saving meeting: ' + (error?.response?.data?.message || error.message));
+      console.error('Error saving meeting:', error);
+      console.error('Error response:', error?.response);
+      console.error('Error data:', error?.response?.data);
+      alert('Error saving meeting: ' + (error?.response?.data?.message || error?.response?.data?.error || error.message));
     }
   };
 
@@ -1227,7 +1253,15 @@ export default function CalendarTab() {
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               <span className="inline-flex items-center gap-1.5 font-mono text-xs text-slate-300">
                                 <Clock className="h-3.5 w-3.5 text-blue-400" />
-                                {meeting.startTime ? new Date(meeting.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Flexible'}
+                                {(() => {
+                                  const raw = meeting.startTime;
+                                  if (!raw) return 'Flexible';
+                                  // If backend sent time with 'Z', strip it to avoid UTC shift
+                                  const sanitized = typeof raw === 'string' && raw.endsWith('Z') ? raw.slice(0, -1) : raw;
+                                  const date = new Date(sanitized);
+                                  if (Number.isNaN(date.getTime())) return raw;
+                                  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                })()}
                               </span>
                             </td>
 

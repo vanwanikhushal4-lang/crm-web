@@ -708,9 +708,14 @@ export default function PipelineTab() {
         ...leadForm,
         product: Array.isArray(leadForm.product) ? leadForm.product.join(', ') : leadForm.product
       };
+      // If editing an existing lead, include the id
+      if (selectedLead?.leadId) {
+        payload.id = selectedLead.leadId;
+      }
       await saveOrUpdateLead(payload);
       alert('Lead opportunity saved successfully!');
       setShowCreateModal(false);
+      setSelectedLead(null);
       // Reset form
       setLeadForm({ company: '', product: [], industry: '', city: '', contactName: '', designation: '', email: '', phone: '', stage: 'NEW_LEAD', dealValue: '', partner: '', leadSource: 'DIRECT', expectedCloseDate: '', priority: 'WARM', notes: '', address: '', customerType: 'Customer', paymentStatus: 'PAYMENT_PENDING' });
       setCompanySearch('');
@@ -808,6 +813,37 @@ export default function PipelineTab() {
   const handleCloseLead = (leadItem) => {
     setSelectedLead(leadItem);
     setShowCloseModal(true);
+  };
+
+  const openEditLeadModal = (leadItem) => {
+    const raw = leadItem.leadData || {};
+    const productValue = raw.product || leadItem.product || '';
+    const productArray = Array.isArray(productValue) ? productValue : (productValue ? productValue.split(', ') : []);
+
+    setLeadForm({
+      company: raw.company || leadItem.company || '',
+      product: productArray,
+      industry: raw.industry || '',
+      city: raw.city || leadItem.city || '',
+      contactName: raw.contactName || leadItem.contactName || '',
+      designation: raw.designation || leadItem.designation || '',
+      email: raw.email || leadItem.email || '',
+      phone: raw.phone || leadItem.phone || '',
+      stage: raw.stage || leadItem.stage || 'NEW_LEAD',
+      dealValue: raw.dealValue || leadItem.dealValue || '',
+      partner: raw.partner || leadItem.partner || '',
+      leadSource: raw.leadSource || leadItem.leadSource || 'DIRECT',
+      expectedCloseDate: raw.expectedCloseDate || leadItem.expectedCloseDate || '',
+      priority: raw.priority || leadItem.priority || 'WARM',
+      notes: raw.notes || leadItem.notes || '',
+      address: raw.address || leadItem.address || '',
+      customerType: raw.customerType || 'Customer',
+      paymentStatus: raw.paymentStatus || 'PAYMENT_PENDING'
+    });
+    setCompanySearch(raw.company || leadItem.company || '');
+    setContactSearch(raw.contactName || leadItem.contactName || '');
+    setSelectedLead(leadItem);
+    setShowCreateModal(true);
   };
 
   const updateMomStage = async (leadItem, nextStep, followUpDate = '') => {
@@ -910,7 +946,6 @@ export default function PipelineTab() {
         paymentStatus: paymentStatus
       };
       await saveOrUpdateLead(payload);
-      alert(`Payment status updated to ${paymentStatus.replace('_', ' ')} successfully.`);
       fetchPipelineData();
     } catch (error) {
       alert('Failed to update payment status: ' + (error?.response?.data?.message || error.message));
@@ -1479,12 +1514,20 @@ export default function PipelineTab() {
                     <td className="py-4 px-5">
                       <div className="flex gap-2 justify-end items-center">
                         {lead.leadId ? (
-                          <button
-                            onClick={() => handleCloseLead(lead)}
-                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
-                          >
-                            Update Lead
-                          </button>
+                          <>
+                            <button
+                              onClick={() => openEditLeadModal(lead)}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleCloseLead(lead)}
+                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                            >
+                              Update Lead
+                            </button>
+                          </>
                         ) : (
                           <button
                             onClick={() => openEditMomModal(lead)}
@@ -1626,12 +1669,20 @@ export default function PipelineTab() {
                           Delete Lead
                         </button>
                         {lead.leadId ? (
-                          <button
-                            onClick={() => handleCloseLead(lead)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
-                          >
-                            Update Lead
-                          </button>
+                          <>
+                            <button
+                              onClick={() => openEditLeadModal(lead)}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleCloseLead(lead)}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
+                            >
+                              Update Lead
+                            </button>
+                          </>
                         ) : (
                           <button
                             onClick={() => openEditMomModal(lead)}
@@ -1663,10 +1714,13 @@ export default function PipelineTab() {
           <div className="bg-[#0c1220] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl animate-fade relative max-h-[90vh] overflow-y-auto hide-scrollbar">
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
-              <h3 className="text-base font-bold text-slate-100">Add Pipeline Opportunity</h3>
+              <h3 className="text-base font-bold text-slate-100">
+                {selectedLead?.leadId ? 'Edit Lead Opportunity' : 'Add Pipeline Opportunity'}
+              </h3>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
+                  setSelectedLead(null);
                   setCompanySearch('');
                   setContactSearch('');
                   setSuggestedCompanies([]);
@@ -1772,7 +1826,7 @@ export default function PipelineTab() {
                       <option key={idx} value={d.name || d}>{d.name || d}</option>
                     ))}
                   </select>
-                  
+
                   <button
                     type="button"
                     onClick={() => setShowAddDesignationInput(!showAddDesignationInput)}
@@ -1801,6 +1855,30 @@ export default function PipelineTab() {
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Industry */}
+              <div>
+                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Industry</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Technology, Healthcare"
+                  value={leadForm.industry}
+                  onChange={(e) => setLeadForm({ ...leadForm, industry: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
+                />
+              </div>
+
+              {/* City */}
+              <div>
+                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">City</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mumbai, Delhi"
+                  value={leadForm.city}
+                  onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
+                />
               </div>
 
               {/* Close Date & Stage */}
@@ -1842,6 +1920,20 @@ export default function PipelineTab() {
                 >
                   <option value="PAYMENT_PENDING">Payment Pending</option>
                   <option value="PAYMENT_COMPLETED">Payment Completed</option>
+                </select>
+              </div>
+
+              {/* Customer Type */}
+              <div>
+                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Customer Type</label>
+                <select
+                  value={leadForm.customerType}
+                  onChange={(e) => setLeadForm({ ...leadForm, customerType: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
+                >
+                  <option value="Customer">Customer</option>
+                  <option value="Lead">Lead</option>
+                  <option value="Partner">Partner</option>
                 </select>
               </div>
 
@@ -1946,7 +2038,7 @@ export default function PipelineTab() {
                 type="submit"
                 className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-all"
               >
-                SAVE LEAD OPPORTUNITY
+                {selectedLead?.leadId ? 'UPDATE LEAD OPPORTUNITY' : 'SAVE LEAD OPPORTUNITY'}
               </button>
 
             </form>
@@ -2143,6 +2235,13 @@ export default function PipelineTab() {
                           key={paymentStatus.value}
                           onClick={async () => {
                             await updatePaymentStatus(selectedLead, paymentStatus.value);
+                            setSelectedLead({
+                              ...selectedLead,
+                              leadData: {
+                                ...selectedLead.leadData,
+                                paymentStatus: paymentStatus.value
+                              }
+                            });
                           }}
                           className={`flex-1 py-2.5 px-3 rounded-xl border text-xs font-bold text-left transition-all duration-200 flex items-center justify-center hover:scale-[1.01] active:scale-[0.99] ${
                           isCurrent
