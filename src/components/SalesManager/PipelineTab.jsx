@@ -233,21 +233,39 @@ export default function PipelineTab() {
     setImportStatus(null);
     try {
       const response = await importLeadsExcel(excelFile);
+      const result = response?.data && typeof response.data === 'object' ? response.data : response;
+      const errors = Array.isArray(result?.errors) ? result.errors : [];
+      const failedCount = Number(result?.failedCount || 0);
+      const hasFailures = failedCount > 0 || errors.length > 0 || response?.success === false;
+      const errorDetails = errors.map((error) => (
+        typeof error === 'string' ? error : error?.message || JSON.stringify(error)
+      ));
       setImportStatus({
-        type: 'success',
-        message: response?.message || response?.data?.message || 'Leads imported successfully from Excel!'
+        type: hasFailures ? 'error' : 'success',
+        message: hasFailures
+          ? `Import completed with ${Number(result?.successCount || 0)} successful and ${failedCount || errors.length} failed record(s).`
+          : response?.message || result?.message || 'Leads imported successfully from Excel!',
+        details: errorDetails
       });
       fetchPipelineData();
-      setTimeout(() => {
-        setShowImportExcelModal(false);
-        setExcelFile(null);
-        setImportStatus(null);
-      }, 1800);
+      if (!hasFailures) {
+        setTimeout(() => {
+          setShowImportExcelModal(false);
+          setExcelFile(null);
+          setImportStatus(null);
+        }, 1800);
+      }
     } catch (err) {
       console.error('Failed to import leads Excel:', err);
+      const responseData = err?.response?.data;
+      const errorResult = responseData?.data ?? responseData;
+      const errors = Array.isArray(errorResult?.errors) ? errorResult.errors : [];
       setImportStatus({
         type: 'error',
-        message: err?.response?.data?.message || err?.message || 'Failed to import Excel file. Please check format and try again.'
+        message: responseData?.message || errorResult?.message || err?.message || 'Failed to import Excel file. Please check format and try again.',
+        details: errors.map((error) => (
+          typeof error === 'string' ? error : error?.message || JSON.stringify(error)
+        ))
       });
     } finally {
       setIsImporting(false);
@@ -2661,7 +2679,16 @@ export default function PipelineTab() {
                 ) : (
                   <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
                 )}
-                <span>{importStatus.message}</span>
+                <div className="min-w-0 flex-1">
+                  <p>{importStatus.message}</p>
+                  {importStatus.details?.length > 0 && (
+                    <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-4 text-[11px] leading-relaxed">
+                      {importStatus.details.map((detail, index) => (
+                        <li key={`${index}-${detail}`}>{detail}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             )}
 
