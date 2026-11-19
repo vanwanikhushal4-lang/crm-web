@@ -1,4 +1,5 @@
 import apiMethods from "../../methods/apiMethods";
+import api from '../../AxiosInterceptor';
 import { API_BASE_URL } from '../../AxiosInterceptor';
 
 const CUSTOMER_MASTER_BASE_URL = API_BASE_URL;
@@ -225,6 +226,32 @@ export const getCalls = async () => {
     return res;
   } catch (error) {
     console.error('Get Calls API Error:', error);
+    throw error;
+  }
+};
+
+export const importCallsExcel = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiMethods.post('/Call/importCallExcel', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res;
+  } catch (error) {
+    console.error('Import Calls API Error:', error);
+    throw error;
+  }
+};
+
+export const exportCallsExcel = async () => {
+  try {
+    const response = await api.get('/Call/exportCallsExcel', { responseType: 'blob' });
+    return response;
+  } catch (error) {
+    console.error('Export Calls API Error:', error);
     throw error;
   }
 };

@@ -19,7 +19,10 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Loader
+  Loader,
+  Upload,
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 
 import {
@@ -33,6 +36,8 @@ import {
   meetingCheckIn,
   saveOrUpdateTaskLog,
   saveOrUpdateCall,
+  importCallsExcel,
+  exportCallsExcel,
   getAttachmentForMeetingLog,
   getAttachmentForMeeting,
   uploadMeetingAttachment,
@@ -49,6 +54,7 @@ export default function CalendarTab() {
   const [isLoading, setIsLoading] = useState(false);
 
   const scrollContainerRef = useRef(null);
+  const callImportInputRef = useRef(null);
 
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -122,6 +128,9 @@ export default function CalendarTab() {
   const [meetings, setMeetings] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [calls, setCalls] = useState([]);
+  const [isImportingCalls, setIsImportingCalls] = useState(false);
+  const [isExportingCalls, setIsExportingCalls] = useState(false);
+  const [callImportStatus, setCallImportStatus] = useState(null);
 
   // Modals visibility
   const [showMeetingModal, setShowMeetingModal] = useState(false);
@@ -660,6 +669,78 @@ export default function CalendarTab() {
       fetchData();
     } catch (error) {
       alert('Error saving task: ' + (error?.response?.data?.message || error.message));
+    }
+  };
+
+  const handleCallImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!['csv', 'xlsx'].includes(extension)) {
+      setCallImportStatus({ type: 'error', message: 'Choose a CSV or XLSX file.' });
+      e.target.value = '';
+      return;
+    }
+
+    setIsImportingCalls(true);
+    setCallImportStatus(null);
+    try {
+      const response = await importCallsExcel(file);
+      const result = response?.data && typeof response.data === 'object' ? response.data : response;
+      const errors = Array.isArray(result?.errors) ? result.errors : [];
+      const successCount = Number(result?.successCount || 0);
+      const failedCount = Number(result?.failedCount || 0);
+      const errorMessages = errors.map((item) => (
+        typeof item === 'string' ? item : item?.message || JSON.stringify(item)
+      ));
+
+      setCallImportStatus({
+        type: failedCount > 0 ? 'warning' : 'success',
+        message: response?.message || result?.message || `Import completed: ${successCount} succeeded, ${failedCount} failed.`,
+        errors: errorMessages
+      });
+      await fetchData();
+    } catch (error) {
+      const backendData = error?.response?.data;
+      const backendMessage = typeof backendData === 'string'
+        ? backendData
+        : backendData?.message || backendData?.error || 'Call import failed.';
+      setCallImportStatus({ type: 'error', message: backendMessage });
+    } finally {
+      setIsImportingCalls(false);
+      if (callImportInputRef.current) callImportInputRef.current.value = '';
+    }
+  };
+
+  const handleCallExport = async () => {
+    setIsExportingCalls(true);
+    setCallImportStatus(null);
+    try {
+      const response = await exportCallsExcel();
+      const disposition = response.headers?.['content-disposition'] || '';
+      const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+      const filename = decodeURIComponent(filenameMatch?.[1] || filenameMatch?.[2] || 'calls_export.xlsx');
+      const blob = response.data instanceof Blob
+        ? response.data
+        : new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+      setCallImportStatus({ type: 'success', message: 'Calls exported successfully.' });
+    } catch (error) {
+      const backendData = error?.response?.data;
+      const backendMessage = typeof backendData === 'string'
+        ? backendData
+        : backendData?.message || backendData?.error || 'Call export failed.';
+      setCallImportStatus({ type: 'error', message: backendMessage });
+    } finally {
+      setIsExportingCalls(false);
     }
   };
 
@@ -1521,6 +1602,34 @@ export default function CalendarTab() {
                 </span>
               </div>
               <div className="flex items-center gap-3">
+                <input
+                  ref={callImportInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  onChange={handleCallImport}
+                  className="hidden"
+                  disabled={isImportingCalls}
+                />
+                <button
+                  type="button"
+                  onClick={() => callImportInputRef.current?.click()}
+                  disabled={isImportingCalls}
+                  className="px-2.5 py-1 bg-emerald-600/10 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow disabled:opacity-60"
+                  title="Import calls from CSV or XLSX"
+                >
+                  {isImportingCalls ? <Loader className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                  <span>{isImportingCalls ? 'Importing' : 'Import'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCallExport}
+                  disabled={isExportingCalls}
+                  className="px-2.5 py-1 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-blue-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow disabled:opacity-60"
+                  title="Export calls to Excel"
+                >
+                  {isExportingCalls ? <Loader className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  <span>{isExportingCalls ? 'Exporting' : 'Export'}</span>
+                </button>
                 <button
                   onClick={() => setShowCallModal(true)}
                   className="px-2.5 py-1 bg-purple-600/10 hover:bg-purple-600 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 animate-fade shadow"
@@ -1537,6 +1646,29 @@ export default function CalendarTab() {
                 </button>
               </div>
             </div>
+
+            {callImportStatus && (
+              <div
+                role="status"
+                className={`px-5 py-3 text-xs border-b border-white/5 ${
+                  callImportStatus.type === 'success'
+                    ? 'text-emerald-300 bg-emerald-500/5'
+                    : callImportStatus.type === 'warning'
+                    ? 'text-amber-300 bg-amber-500/5'
+                    : 'text-rose-300 bg-rose-500/5'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                  <span>{callImportStatus.message}</span>
+                </div>
+                {callImportStatus.errors?.length > 0 && (
+                  <ul className="mt-2 ml-6 list-disc space-y-1">
+                    {callImportStatus.errors.map((message, index) => <li key={`${index}-${message}`}>{message}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {/* Table block for Calls */}
             {!collapseCalls && (
