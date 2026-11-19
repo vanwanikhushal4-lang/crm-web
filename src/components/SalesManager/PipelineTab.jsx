@@ -1103,6 +1103,13 @@ export default function PipelineTab() {
       return matchQuery && matchStage && matchPriority;
     })
     .sort((a, b) => {
+      if (advancedFilters.sortField === 'companyName') {
+        const aName = String(a.company || '').trim().toLocaleLowerCase();
+        const bName = String(b.company || '').trim().toLocaleLowerCase();
+        const comparison = aName.localeCompare(bName, undefined, { sensitivity: 'base', numeric: true });
+        return advancedFilters.sortDirection === 'asc' ? comparison : -comparison;
+      }
+
       return (new Date(b.followUpDate || b.updatedAt || 0) - new Date(a.followUpDate || a.updatedAt || 0));
     });
 
@@ -1166,6 +1173,13 @@ export default function PipelineTab() {
       (dbStages.includes('QUALIFIED') && row.stage.toLowerCase().includes('discussion')) ||
       (dbStages.includes('PROPOSAL_SENT') && row.stage.toLowerCase().includes('proposal'))
     );
+  };
+
+  const handleCompanySort = () => {
+    setAdvancedFilters((prev) => ({
+      sortField: 'companyName',
+      sortDirection: prev.sortField === 'companyName' && prev.sortDirection === 'asc' ? 'desc' : 'asc'
+    }));
   };
 
   return (
@@ -1484,7 +1498,19 @@ export default function PipelineTab() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 bg-slate-900/40 text-[11px] text-slate-400 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-5">Company / Client</th>
+                  <th className="py-4 px-5">Company / Client
+                    <button
+                      onClick={handleCompanySort}
+                      className="ml-2 text-slate-400 hover:text-white transition-all"
+                      title="Sort A-Z / Z-A"
+                    >
+                      {advancedFilters.sortField === 'companyName' && advancedFilters.sortDirection === 'asc' ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+                  </th>
                   <th className="py-4 px-5">Contact Person</th>
                   <th className="py-4 px-5">Designation</th>
                   <th className="py-4 px-5">Stage</th>
@@ -1575,7 +1601,7 @@ export default function PipelineTab() {
               </tbody>
             </table>
           </div>
-        </div>
+               </div>
       )}
 
       {/* 2. LIST VIEW (EXPANDABLE LIST) */}
@@ -2353,7 +2379,7 @@ export default function PipelineTab() {
                         setTempSelectedStage(null);
                         setFollowUpDate('');
                       }}
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition"
                     >
                       Save Follow Up & Update
                     </button>
@@ -2625,7 +2651,7 @@ export default function PipelineTab() {
                   setExcelFile(null);
                   setImportStatus(null);
                 }}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                className="p-1.5 text-slate-400 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>

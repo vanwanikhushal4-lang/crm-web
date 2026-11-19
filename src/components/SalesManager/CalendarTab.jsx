@@ -83,7 +83,7 @@ export default function CalendarTab() {
         });
       }
     }
-  }, [selectedDate]);
+  }, []);
 
   // Mouse drag-to-scroll handlers for desktop usability
   const handleMouseDown = (e) => {
@@ -673,7 +673,8 @@ export default function CalendarTab() {
         callResult: callForm.callResult,
         subject: callForm.subject || `Call to ${callForm.customerName || 'client'}`,
         description: callForm.description,
-        notes: callForm.notes
+        notes: callForm.notes,
+        callDate: getLocalDateString(selectedDate)
       };
       await saveOrUpdateCall(payload);
       alert('Call log saved successfully!');
@@ -681,7 +682,12 @@ export default function CalendarTab() {
       setCallForm({ customerId: '', customerName: '', customerPhone: '', relatedTo: 'LEADS', callType: 'OUTGOING', callResult: 'NONE', subject: '', description: '', notes: '' });
       fetchData();
     } catch (error) {
-      alert('Error logging call: ' + (error?.response?.data?.message || error.message));
+      const backendData = error?.response?.data;
+      const backendMessage = typeof backendData === 'string'
+        ? backendData
+        : backendData?.message || backendData?.error || JSON.stringify(backendData);
+      console.error('Call save 400 response:', backendData);
+      alert('Error logging call: ' + (backendMessage || error.message));
     }
   };
 
@@ -984,9 +990,9 @@ export default function CalendarTab() {
         (c.subject && c.subject.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (c.callResult && c.callResult.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      // Note: check date comparison fields in call endpoint logs.
-      const dateObj = c.createdAt ? new Date(c.createdAt) : c.dueDate ? new Date(c.dueDate) : new Date();
-      return isSameDay(dateObj, selectedDate) && matchSearch;
+      // Use the call's explicit date/time first so yesterday's log stays on yesterday.
+      const dateObj = getCallDateObject(c);
+      return dateObj && isSameDay(dateObj, selectedDate) && matchSearch;
     });
   };
 
@@ -1003,8 +1009,8 @@ export default function CalendarTab() {
     }).length;
 
     const cCount = calls.filter((c) => {
-      const d = c.createdAt ? new Date(c.createdAt) : c.dueDate ? new Date(c.dueDate) : new Date();
-      return isSameDay(d, dateVal);
+      const d = getCallDateObject(c);
+      return d && isSameDay(d, dateVal);
     }).length;
 
     return mCount + tCount + cCount;
@@ -1139,7 +1145,8 @@ export default function CalendarTab() {
 
           {/* Next Day arrow */}
           <button
-            onClick={() => shiftDay(1)}
+            onClick={() => shiftDay(1)
+}
             className="p-2 rounded-xl bg-slate-900/40 border border-white/5 hover:bg-slate-800 text-slate-400 hover:text-white transition shrink-0"
           >
             <ChevronRight className="h-4 w-4" />
@@ -1745,11 +1752,8 @@ export default function CalendarTab() {
                     type="datetime-local"
                     value={meetingForm.startTime}
                     onChange={(e) => setMeetingForm({ ...meetingForm, startTime: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-150 cursor-pointer"
-                    style={{ colorScheme: 'dark' }}
-                    required
-                  />
-                </div>
+                                                         required                  />
+                               </div>
                 <div>
                   <label className="text-xs text-slate-400 font-semibold mb-1.5 block">End Time</label>
                   <input
@@ -2026,7 +2030,7 @@ export default function CalendarTab() {
                             }));
                             setShowNewCustomerForm(true);
                           }}
-                          className="p-3 hover:bg-blue-600/20 text-blue-400 text-xs font-semibold cursor-pointer border-b border-white/5 flex items-center gap-1.5"
+                          className="p-3 hover:bg-blue-600/20 text-blue-400 text-xs font-semibold cursor-pointer border-b border-white/5"
                         >
                           <Plus className="h-3.5 w-3.5 shrink-0" />
                           <span>Add New Customer Entry: "{contactProfileSearch || 'New Customer'}"</span>
@@ -2135,7 +2139,7 @@ export default function CalendarTab() {
                       type="button"
                       onClick={handleCreateCustomerInModal}
                       disabled={isSavingCustomer}
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow"
+                      className="w-full py-2 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow"
                     >
                       {isSavingCustomer ? 'Saving Customer...' : 'Save & Select Customer'}
                     </button>
@@ -2151,8 +2155,8 @@ export default function CalendarTab() {
                   onChange={(e) => setCallForm({ ...callForm, relatedTo: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
                 >
-                  {['ACCOUNTS', 'CAMPAIGNS', 'CASES', 'DEALS', 'INVOICES', 'LEADS', 'PRODUCTS', 'PURCHASE_ORDERS', 'QUOTES', 'SALES_ORDERS', 'VENDORS'].map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {['SELECT_MODULE', 'ACCOUNTS', 'CAMPAIGNS', 'CASES', 'DEALS', 'INVOICES', 'LEADS', 'PRODUCTS', 'PURCHASE_ORDERS', 'QUOTES', 'SALES_ORDERS', 'VENDORS', 'REQUEST_FOR_MEETING', 'INTRODUCTORY_CALL', 'FOLLOW_UP'].map((cat) => (
+                    <option key={cat} value={cat}>{cat.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</option>
                   ))}
                 </select>
               </div>
@@ -2186,8 +2190,8 @@ export default function CalendarTab() {
                   onChange={(e) => setCallForm({ ...callForm, callResult: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
                 >
-                  {['NONE', 'INTERESTED', 'NOT_INTERESTED', 'NO_RESPONSE_BUSY', 'REQUESTED_MORE_INFO', 'REQUESTED_CALL_BACK', 'INVALID_NUMBER'].map((res) => (
-                    <option key={res} value={res}>{res.replace(/_/g, ' ')}</option>
+                  {['NONE', 'INTERESTED', 'NOT_INTERESTED', 'NO_RESPONSE_BUSY', 'REQUESTED_MORE_INFO', 'REQUESTED_CALL_BACK', 'INVALID_NUMBER', 'MEETING_SCHEDULED'].map((res) => (
+                    <option key={res} value={res}>{res.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</option>
                   ))}
                 </select>
               </div>
@@ -2382,7 +2386,7 @@ export default function CalendarTab() {
                               />
                               {label}
                             </label>
-                          );
+                        );
                         })}
                         {productsCatalog.length === 0 && (
                           <p className="text-[9px] text-slate-500 italic col-span-2">No products available</p>
@@ -2584,3 +2588,17 @@ export default function CalendarTab() {
     </div>
   );
 }
+
+// Call date parser
+const getCallDateObject = (call) => {
+  const rawDate = call?.callDate || call?.callTime || call?.createdDate || call?.createdAt || call?.date || call?.timestamp || call?.dueDate;
+  if (!rawDate) return null;
+
+  if (typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    const [year, month, day] = rawDate.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const dateObj = new Date(rawDate);
+  return isNaN(dateObj.getTime()) ? null : dateObj;
+};

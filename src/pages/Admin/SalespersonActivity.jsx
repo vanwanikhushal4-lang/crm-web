@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchSalesPersonList, fetchSalesPersonActivity, fetchMOMDetails, fetchTaskLogs, fetchCalls, fetchCompanies, fetchCustomers, fetchMeetingLogs } from '../../api/Admin/SalespersonApi';
-import { User, Calendar, MapPin, Search, ChevronRight, Activity, Phone, CheckSquare, Users, ChevronLeft } from 'lucide-react';
+import { User, Calendar, MapPin, Search, ChevronRight, Activity, Phone, CheckSquare, Users, ChevronLeft, CheckCircle2, Clock } from 'lucide-react';
 
 export default function SalespersonActivity() {
   const [salespersons, setSalespersons] = useState([]);
@@ -10,6 +10,7 @@ export default function SalespersonActivity() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [userActivity, setUserActivity] = useState([]);
   const [userMeetings, setUserMeetings] = useState([]);
+  const [userMoms, setUserMoms] = useState([]);
   const [userTasks, setUserTasks] = useState([]);
   const [userCalls, setUserCalls] = useState([]);
   
@@ -115,6 +116,7 @@ export default function SalespersonActivity() {
     setIsLoadingActivity(true);
     setUserActivity([]);
     setUserMeetings([]);
+    setUserMoms([]);
     setUserTasks([]);
     setUserCalls([]);
     
@@ -138,20 +140,25 @@ export default function SalespersonActivity() {
       
       const allMoms = extract(momRes);
       const allLogs = extract(logRes);
+      const ownerIdOf = (record) => record.salesmanId || record.salesman_id || record.salesPersonId || record.salespersonId ||
+        record.salesManagerId || record.userId || record.user_id || record.createdById || record.createdBy || record.created_by;
+      setUserMoms(allMoms.filter(m => String(ownerIdOf(m)) === userId));
       const combinedMeetings = [...allMoms, ...allLogs];
-      setUserMeetings(combinedMeetings.filter(m => 
-        String(m.salesmanId || m.salesman_id || m.userId || m.user_id || m.createdById) === userId
-      ));
+      setUserMeetings(combinedMeetings.filter(m => String(ownerIdOf(m)) === userId));
 
       const allTasks = extract(taskRes);
-      setUserTasks(allTasks.filter(t => 
-        String(t.userId || t.user_id || t.assignedToId || t.salesman_id || t.salesmanId) === userId
-      ));
+      setUserTasks(allTasks.filter(t => {
+        const ownerId = t.userId || t.user_id || t.assignedToId || t.assignedTo || t.salesman_id ||
+          t.salesmanId || t.salesPersonId || t.salespersonId || t.salesManagerId || t.createdById || t.createdBy;
+        return String(ownerId) === userId;
+      }));
 
       const allCalls = extract(callRes);
-      setUserCalls(allCalls.filter(c => 
-        String(c.userId || c.user_id || c.salesman_id || c.salesmanId) === userId
-      ));
+      setUserCalls(allCalls.filter(c => {
+        const ownerId = c.userId || c.user_id || c.assignedToId || c.assignedTo || c.salesman_id ||
+          c.salesmanId || c.salesPersonId || c.salespersonId || c.salesManagerId || c.createdById || c.createdBy;
+        return String(ownerId) === userId;
+      }));
 
     } catch (error) {
       console.error(error);
@@ -207,38 +214,93 @@ export default function SalespersonActivity() {
 
   const getDateStr = (val) => {
     if (!val) return null;
-    if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) return val.slice(0, 10);
+    if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) return val;
     try {
       const d = new Date(val);
-      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      if (!isNaN(d.getTime())) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      }
     } catch(e) {}
     return null;
   };
 
+  const parseLocalDate = (dateStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const getMeetingDate = (meeting) => meeting.meetingDate || meeting.meeting_date || meeting.startTime ||
+    meeting.start_time || meeting.scheduledDate || meeting.scheduled_date || meeting.createdDate || meeting.createdAt || meeting.date;
+  const getMeetingEndDate = (meeting) => meeting.endTime || meeting.end_time || meeting.meetingEndTime || meeting.meeting_end_time;
+  const getTaskDate = (task) => task.dueDate || task.due_date || task.taskDate || task.task_date || task.createdDate || task.createdAt || task.date || task.startTime || task.callTime || task.timestamp;
+  const getCallDate = (call) => call.callDate || call.callTime || call.createdDate || call.createdAt || call.date || call.startTime || call.timestamp;
+  const getActivityDate = (activity) => activity.date || activity.createdAt || activity.loginTime || activity.login_time || activity.checkInTime;
+
+  const isMeetingCompleted = (meeting) => {
+    const status = String(meeting.status || meeting.meetingStatus || meeting.meeting_status || meeting.momStatus || '').toLowerCase();
+    if (meeting.isCompleted === true || meeting.completed === true || meeting.momCompleted === true ||
+      ['completed', 'complete', 'done', 'closed'].includes(status)) return true;
+
+    const meetingIds = [meeting.meetingId, meeting.meeting_id, meeting.plannedMeetingId, meeting.planned_meeting_id,
+      meeting.meetingLogId, meeting.meeting_log_id, meeting.logId, meeting.id].map(value => String(value || '')).filter(Boolean);
+    const companyName = String(meeting.companyName || meeting.name || meeting.customerName || '').trim().toLowerCase();
+    return userMoms.some(mom => {
+      const momIds = [mom.meetingId, mom.meeting_id, mom.plannedMeetingId, mom.planned_meeting_id,
+        mom.meetingLogId, mom.meeting_log_id, mom.logId].map(value => String(value || '')).filter(Boolean);
+      if (Array.isArray(mom.meetingIds)) momIds.push(...mom.meetingIds.map(String));
+      if (meetingIds.some(id => momIds.includes(id))) return true;
+      const momCompany = String(mom.companyName || mom.customerName || mom.name || '').trim().toLowerCase();
+      return companyName && momCompany === companyName;
+    });
+  };
+
+  const formatMeetingTime = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   const adjustDate = (days) => {
-    const d = new Date(selectedDateStr);
+    const d = parseLocalDate(selectedDateStr);
     d.setDate(d.getDate() + days);
     setSelectedDateStr(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
   };
 
   // Filter activities by date
-  const filteredMeetings = useMemo(() => userMeetings.filter(m => getDateStr(m.meetingDate || m.createdAt || m.date) === selectedDateStr), [userMeetings, selectedDateStr]);
-  const filteredTasks = useMemo(() => userTasks.filter(t => getDateStr(t.dueDate || t.createdAt || t.date) === selectedDateStr), [userTasks, selectedDateStr]);
-  const filteredCalls = useMemo(() => userCalls.filter(c => getDateStr(c.callDate || c.createdAt || c.date) === selectedDateStr), [userCalls, selectedDateStr]);
-  const filteredActivity = useMemo(() => userActivity.filter(a => getDateStr(a.date || a.createdAt || a.loginTime) === selectedDateStr), [userActivity, selectedDateStr]);
+  const filteredMeetings = useMemo(() => userMeetings.filter(m => getDateStr(getMeetingDate(m)) === selectedDateStr), [userMeetings, selectedDateStr]);
+  const filteredTasks = useMemo(() => userTasks.filter(t => getDateStr(getTaskDate(t)) === selectedDateStr), [userTasks, selectedDateStr]);
+  const filteredCalls = useMemo(() => userCalls.filter(c => getDateStr(getCallDate(c)) === selectedDateStr), [userCalls, selectedDateStr]);
+  const filteredActivity = useMemo(() => userActivity.filter(a => getDateStr(getActivityDate(a)) === selectedDateStr), [userActivity, selectedDateStr]);
+
+  const activityCountsByDate = useMemo(() => {
+    const counts = {};
+    const addCounts = (records, getDate, type) => {
+      records.forEach((record) => {
+        const date = getDateStr(getDate(record));
+        if (!date) return;
+        counts[date] ||= { meetings: 0, tasks: 0, calls: 0, locations: 0 };
+        counts[date][type] += 1;
+      });
+    };
+    addCounts(userMeetings, getMeetingDate, 'meetings');
+    addCounts(userTasks, getTaskDate, 'tasks');
+    addCounts(userCalls, getCallDate, 'calls');
+    addCounts(userActivity, getActivityDate, 'locations');
+    return counts;
+  }, [userMeetings, userTasks, userCalls, userActivity]);
 
   const hasNoActivity = filteredMeetings.length === 0 && filteredTasks.length === 0 && filteredCalls.length === 0 && filteredActivity.length === 0;
 
   const timelineDates = useMemo(() => {
     const dates = [];
-    const today = new Date();
-    for (let i = -45; i <= 15; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
+    const selectedDate = parseLocalDate(selectedDateStr);
+    for (let i = -30; i <= 30; i++) {
+      const d = new Date(selectedDate);
+      d.setDate(selectedDate.getDate() + i);
       dates.push(d);
     }
     return dates;
-  }, []);
+  }, [selectedDateStr]);
 
   useEffect(() => {
     if (timelineRef.current && selectedUser) {
@@ -253,7 +315,7 @@ export default function SalespersonActivity() {
   }, [selectedDateStr, selectedUser]);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 min-h-[75vh]">
+    <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-6 min-h-[75vh]">
       
       {/* Left Column: User List */}
       <div className="w-full lg:w-80 bg-[#0c1220] border border-white/5 rounded-2xl p-5 shrink-0 flex flex-col h-[650px] lg:h-auto overflow-hidden">
@@ -316,7 +378,7 @@ export default function SalespersonActivity() {
       </div>
 
       {/* Right Column: Calendar / Activity History */}
-      <div className="flex-1 bg-[#0c1220] border border-white/5 rounded-2xl p-6 flex flex-col overflow-y-auto animate-fade">
+      <div className="min-w-0 bg-[#0c1220] border border-white/5 rounded-2xl p-6 flex flex-col overflow-y-auto animate-fade">
         {!selectedUser ? (
           <div className="flex flex-col items-center justify-center h-full py-16 text-center text-slate-500 space-y-3">
             <div className="h-16 w-16 rounded-2xl bg-slate-800/80 border border-white/10 flex items-center justify-center mb-2">
@@ -371,18 +433,25 @@ export default function SalespersonActivity() {
             <div className="mb-6 animate-slide-in stagger-1">
               <div className="timeline-strip hide-scrollbar flex gap-2 overflow-x-auto pb-2" ref={timelineRef}>
                 {timelineDates.map((dateObj, idx) => {
-                  const dStr = dateObj.toISOString().split('T')[0];
+                  const dStr = getDateStr(dateObj);
                   const isSelected = dStr === selectedDateStr;
                   const dayName = dateObj.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase();
                   const dateNum = dateObj.getDate();
-                  const isToday = dStr === new Date().toISOString().split('T')[0];
+                  const isToday = dStr === getDateStr(new Date());
+                  const activityCounts = activityCountsByDate[dStr] || {};
+                  const activityMarkers = [
+                    { type: 'meetings', count: activityCounts.meetings, label: 'meetings', Icon: Users, color: 'text-amber-300' },
+                    { type: 'tasks', count: activityCounts.tasks, label: 'tasks', Icon: CheckSquare, color: 'text-emerald-300' },
+                    { type: 'calls', count: activityCounts.calls, label: 'calls', Icon: Phone, color: 'text-purple-300' },
+                    { type: 'locations', count: activityCounts.locations, label: 'location logs', Icon: MapPin, color: 'text-sky-300' }
+                  ].filter((item) => item.count > 0);
                   
                   return (
                     <div 
                       key={idx} 
-                      className={`flex flex-col items-center justify-center p-3 rounded-xl border cursor-pointer min-w-[64px] transition-all duration-200 shrink-0 ${
+                      className={`flex min-h-19 flex-col items-center justify-center p-2 rounded-xl border cursor-pointer min-w-18 transition-all duration-200 shrink-0 ${
                         isSelected 
-                          ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20 scale-105' 
+                          ? 'active bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20 scale-105' 
                           : 'bg-slate-900/50 border-white/5 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
                       }`}
                       onClick={() => setSelectedDateStr(dStr)}
@@ -393,6 +462,13 @@ export default function SalespersonActivity() {
                       <span className="text-lg font-bold mt-0.5">
                         {dateNum}
                       </span>
+                      <div className="mt-1 grid min-h-5 w-full grid-cols-2 auto-rows-2.5 justify-items-center gap-x-1">
+                        {activityMarkers.map(({ type, count, label, Icon, color }) => (
+                          <span key={type} title={`${count} ${label}`} aria-label={`${count} ${label}`} className={`flex items-center gap-0.5 text-[9px] leading-none ${color}`}>
+                            <Icon className="h-2.5 w-2.5" />{count}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
@@ -406,7 +482,7 @@ export default function SalespersonActivity() {
             ) : hasNoActivity ? (
               <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-12 text-center text-slate-500 space-y-2">
                 <Calendar className="h-8 w-8 text-slate-600 mx-auto" />
-                <p className="text-slate-400 text-sm">No recorded activities for {new Date(selectedDateStr).toLocaleDateString()}.</p>
+                <p className="text-slate-400 text-sm">No recorded activities for {parseLocalDate(selectedDateStr).toLocaleDateString()}.</p>
               </div>
             ) : (
               <div className="space-y-6">
@@ -418,11 +494,42 @@ export default function SalespersonActivity() {
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {filteredMeetings.map((mom, idx) => (
-                        <div key={idx} className="bg-amber-500/10 border-l-4 border-amber-500 p-3.5 rounded-r-xl border-y border-r border-white/5 space-y-1">
-                          <div className="font-semibold text-slate-200 text-sm">{resolveEntityName(mom)}</div>
-                          <div className="text-xs text-slate-400">
-                            {mom.meetingDate ? new Date(mom.meetingDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'No time'} • {mom.meetingType || 'Meeting'}
+                        <div key={idx} className="bg-amber-500/10 border-l-4 border-amber-500 p-3.5 rounded-r-xl border-y border-r border-white/5 space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-200 text-sm">{resolveEntityName(mom)}</div>
+                              {(mom.contactPersonName || mom.contactPerson || mom.personName) && (
+                                <div className="mt-0.5 text-xs text-slate-400">Contact: {mom.contactPersonName || mom.contactPerson || mom.personName}</div>
+                              )}
+                            </div>
+                            {isMeetingCompleted(mom) ? (
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-300">
+                                <CheckCircle2 className="h-3 w-3" /> Completed
+                              </span>
+                            ) : (
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-300">
+                                <Clock className="h-3 w-3" /> Pending MOM
+                              </span>
+                            )}
                           </div>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+                            <span>{formatMeetingTime(getMeetingDate(mom)) || 'Time not set'}{formatMeetingTime(getMeetingEndDate(mom)) ? ` - ${formatMeetingTime(getMeetingEndDate(mom))}` : ''}</span>
+                            {(mom.meetingType || mom.engagement_type || mom.engagementType) && <span>{mom.meetingType || mom.engagement_type || mom.engagementType}</span>}
+                          </div>
+                          {(mom.locationName || mom.location || mom.address) && (
+                            <div className="flex items-start gap-1.5 text-xs text-slate-400">
+                              <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-amber-300" />
+                              <span>{mom.locationName || mom.location || mom.address}</span>
+                            </div>
+                          )}
+                          {(mom.momDescription || mom.momDetails || mom.minutesOfMeeting || mom.notes || mom.description) && (
+                            <p className="border-t border-white/5 pt-2 text-xs leading-relaxed text-slate-300">
+                              {mom.momDescription || mom.momDetails || mom.minutesOfMeeting || mom.notes || mom.description}
+                            </p>
+                          )}
+                          {!mom.contactPersonName && !mom.contactPerson && !mom.personName && !mom.locationName && !mom.location && !mom.address && !mom.momDescription && !mom.momDetails && !mom.minutesOfMeeting && !mom.notes && !mom.description && (
+                            <p className="text-xs text-slate-500">No additional meeting details recorded.</p>
+                          )}
                         </div>
                       ))}
                     </div>
