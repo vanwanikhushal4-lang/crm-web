@@ -10,6 +10,16 @@ export const fetchSalesPersonList = async () => {
   }
 };
 
+export const fetchInsideSalesList = async () => {
+  try {
+    const response = await apiMethods.get('/customerMaster/insideSales');
+    return response;
+  } catch (error) {
+    console.error('Error fetching inside sales list:', error);
+    throw error;
+  }
+};
+
 export const fetchSalesPersonActivity = async (id) => {
   try {
     const response = await apiMethods.get(`/salesperson/fetchDailyLocations/${id}`);

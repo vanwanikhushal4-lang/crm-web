@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { fetchSalesPersonList, fetchSalesPersonActivity, fetchMOMDetails, fetchTaskLogs, fetchCalls, fetchCompanies, fetchCustomers, fetchMeetingLogs } from '../../api/Admin/SalespersonApi';
+import { fetchSalesPersonList, fetchInsideSalesList, fetchSalesPersonActivity, fetchMOMDetails, fetchTaskLogs, fetchCalls, fetchCompanies, fetchCustomers, fetchMeetingLogs } from '../../api/Admin/SalespersonApi';
 import { User, Calendar, MapPin, Search, ChevronRight, Activity, Phone, CheckSquare, Users, ChevronLeft, CheckCircle2, Clock } from 'lucide-react';
 
 export default function SalespersonActivity() {
@@ -92,9 +92,28 @@ export default function SalespersonActivity() {
   const loadUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const res = await fetchSalesPersonList();
-      const list = res?.data?.data || res?.data || res || [];
-      const arr = Array.isArray(list) ? list : [];
+      const [managerRes, insideSalesRes] = await Promise.all([
+        fetchSalesPersonList().catch((error) => {
+          console.error('Failed to load sales managers:', error);
+          return [];
+        }),
+        fetchInsideSalesList().catch((error) => {
+          console.error('Failed to load inside sales:', error);
+          return [];
+        })
+      ]);
+      const extractUsers = (response) => {
+        const list = response?.data?.data || response?.data || response || [];
+        return Array.isArray(list) ? list : [];
+      };
+      const managers = extractUsers(managerRes);
+      const insideSales = extractUsers(insideSalesRes).map((user) => ({ ...user, teamType: 'Inside Sales' }));
+      const usersById = new Map();
+      [...managers, ...insideSales].forEach((user) => {
+        const userId = user.id || user.userId || user.salesPersonId || user.salespersonId;
+        if (userId != null && !usersById.has(String(userId))) usersById.set(String(userId), user);
+      });
+      const arr = Array.from(usersById.values());
       
       const excludedIds = new Set([139, 141, 142, 148, 149, 151].map(String));
       const filteredArr = arr.filter(user => {
@@ -192,6 +211,7 @@ export default function SalespersonActivity() {
 
   const getRepRole = (user) => {
     if (!user) return 'Sales Manager';
+    if (user.teamType === 'Inside Sales') return user.teamType;
     const userStr = JSON.stringify(user).toLowerCase();
     if (userStr.includes('outsider') || userStr.includes('outside') || user.isOutside || user.isOutsider) {
       return 'Outsider';
@@ -271,6 +291,27 @@ export default function SalespersonActivity() {
   const filteredTasks = useMemo(() => userTasks.filter(t => getDateStr(getTaskDate(t)) === selectedDateStr), [userTasks, selectedDateStr]);
   const filteredCalls = useMemo(() => userCalls.filter(c => getDateStr(getCallDate(c)) === selectedDateStr), [userCalls, selectedDateStr]);
   const filteredActivity = useMemo(() => userActivity.filter(a => getDateStr(getActivityDate(a)) === selectedDateStr), [userActivity, selectedDateStr]);
+
+  const groupedMeetings = useMemo(() => {
+    const groups = new Map();
+    filteredMeetings.forEach((meeting, index) => {
+      const customerId = meeting.customerId || meeting.customer_id || meeting.customerID || meeting.accountId ||
+        meeting.account_id || meeting.idCustomer || meeting.customerMasterId || meeting.customer?.id || meeting.account?.id;
+      const companyId = meeting.companyId || meeting.company_id || meeting.company?.id;
+      const label = (customerId && customerMap[String(customerId)]) ||
+        (companyId && companyMap[String(companyId)]) ||
+        meeting.companyName || meeting.company_name || resolveEntityName(meeting);
+      const groupKey = customerId
+        ? `customer-${customerId}`
+        : companyId
+        ? `company-${companyId}`
+        : `name-${String(label).trim().toLowerCase() || index}`;
+
+      if (!groups.has(groupKey)) groups.set(groupKey, { key: groupKey, label, entries: [] });
+      groups.get(groupKey).entries.push(meeting);
+    });
+    return Array.from(groups.values());
+  }, [filteredMeetings, customerMap, companyMap]);
 
   const activityCountsByDate = useMemo(() => {
     const counts = {};
@@ -492,9 +533,21 @@ export default function SalespersonActivity() {
                     <h3 className="text-sm font-semibold text-amber-400 flex items-center gap-2">
                       <Users className="h-4 w-4" /> Meetings ({filteredMeetings.length})
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {filteredMeetings.map((mom, idx) => (
-                        <div key={idx} className="bg-amber-500/10 border-l-4 border-amber-500 p-3.5 rounded-r-xl border-y border-r border-white/5 space-y-2">
+                    <div className="space-y-4">
+                      {groupedMeetings.map((group) => (
+                        <section key={group.key} className="space-y-2">
+                          <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/15 bg-amber-500/5 px-3 py-2">
+                            <div className="min-w-0">
+                              <span className="mr-2 text-[10px] font-semibold uppercase tracking-wide text-amber-300/70">Customer</span>
+                              <span className="text-xs font-bold text-amber-100">{group.label}</span>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
+                              {group.entries.length} {group.entries.length === 1 ? 'entry' : 'entries'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {group.entries.map((mom, idx) => (
+                        <div key={mom.meetingId || mom.meetingLogId || mom.id || `${group.key}-${idx}`} className="bg-amber-500/10 border-l-4 border-amber-500 p-3.5 rounded-r-xl border-y border-r border-white/5 space-y-2">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div className="font-semibold text-slate-200 text-sm">{resolveEntityName(mom)}</div>
@@ -531,6 +584,9 @@ export default function SalespersonActivity() {
                             <p className="text-xs text-slate-500">No additional meeting details recorded.</p>
                           )}
                         </div>
+                            ))}
+                          </div>
+                        </section>
                       ))}
                     </div>
                   </div>

@@ -547,12 +547,16 @@ export default function PipelineTab() {
 
       const contactName = 
         lead?.contactName || 
+        lead?.contactPersonName ||
+        lead?.contact_person_name ||
         lead?.contact || 
+        mom?.customerName ||
         customer?.contactPerson || 
         customer?.contactPersonName || 
+        customer?.contact_person_name ||
+        customer?.contactName ||
+        customer?.contact_name ||
         customer?.name || 
-        mom?.contactPersonName || 
-        mom?.contactName || 
         'Unassigned';
       const stage = lead ? getStageFromLead(lead, mom) : mom ? getStageFromMom(mom) : 'NEW_LEAD';
 
