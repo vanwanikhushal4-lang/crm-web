@@ -74,7 +74,7 @@ export default function AdminDashboard() {
   const navigationItems = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'dssr', label: 'DSSR Activity', icon: FileText },
-    { id: 'inside-sales', label: 'Inside Sales', icon: Headphones },
+    { id: 'inside-sales', label: 'POS', icon: Headphones },
     { id: 'attendance', label: 'Daily Attendance', icon: Clock },
     { id: 'tracking', label: 'Live Map Tracking', icon: Map },
     { id: 'sales-calendar', label: 'Calendars', icon: CalendarDays },
@@ -88,7 +88,7 @@ export default function AdminDashboard() {
       case 'dssr':
         return 'DSSR Activity Logs & Analytics';
       case 'inside-sales':
-        return 'Inside Sales';
+        return 'POS';
       case 'attendance':
         return 'Daily Attendance';
       case 'tracking':

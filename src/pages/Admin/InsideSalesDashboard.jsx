@@ -9,6 +9,13 @@ import { getCalls } from '../../api/apiFunctions/Login/Login_api_function';
 const DAY_FORMAT = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 const CHART_DAY_FORMAT = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
 const CALLS_PER_PAGE = 12;
+const ADDITIONAL_POS_REPS = [
+  { id: '160', name: 'Romit kr atta' },
+  { id: '158', name: 'Bhumi Mehta' },
+  { id: '156', name: 'Piya Bhattacharya' },
+  { id: '159', name: 'Pinki vulo' },
+  { id: '146', name: 'Pratibha Bajloor' },
+];
 const PANEL = 'rounded-2xl border border-white/10 bg-[#0c1220]';
 const CONTROL = 'rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:border-sky-500/50 focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-40';
 const REACHED = new Set([
@@ -48,7 +55,7 @@ function decodeList(response, key) {
 }
 
 function buildRoster(users) {
-  const roster = new Map();
+  const roster = new Map(ADDITIONAL_POS_REPS.map(rep => [rep.id, rep]));
   for (const user of users) {
     const id = String(user?.id ?? user?.userId ?? user?.user_id ?? user?.salesPersonId ?? user?.salespersonId ?? '').trim();
     if (!id) continue;
@@ -170,7 +177,7 @@ export default function InsideSalesDashboard() {
       })
       .catch(err => {
         if (!active) return;
-        console.error('Inside Sales call report failed to load:', err);
+        console.error('POS call report failed to load:', err);
         setError(true);
       });
     return () => { active = false; };
@@ -217,7 +224,7 @@ export default function InsideSalesDashboard() {
     <section aria-labelledby="inside-sales-heading" className="mx-auto max-w-[1440px] space-y-5 animate-fade">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 id="inside-sales-heading" className="text-2xl font-bold tracking-tight text-white">Inside Sales Calling</h1>
+          <h1 id="inside-sales-heading" className="text-2xl font-bold tracking-tight text-white">POS Calling</h1>
           <p className="mt-1 text-sm text-slate-400">Daily call activity and team contributions</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -232,21 +239,20 @@ export default function InsideSalesDashboard() {
 
       {error && (
         <div role="alert" className={PANEL + ' flex flex-wrap items-center justify-between gap-3 p-5'}>
-          <p className="text-sm text-rose-200">Couldn’t load the Inside Sales roster or call logs.</p>
+          <p className="text-sm text-rose-200">Couldn’t load the POS roster or call logs.</p>
           <button type="button" className={CONTROL} onClick={reload}>Retry</button>
         </div>
       )}
-      {!data && !error && <p role="status" className={PANEL + ' p-6 text-sm text-slate-400'}>Loading Inside Sales call activity…</p>}
+      {!data && !error && <p role="status" className={PANEL + ' p-6 text-sm text-slate-400'}>Loading POS call activity…</p>}
       {data && (
         <>
-          {!data.roster.size && <p className={PANEL + ' p-5 text-sm text-slate-400'}>The Inside Sales roster is empty.</p>}
           <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))' }}>
             <MetricCard label="Calls logged" value={total} icon={Phone} tone="bg-sky-500/10 text-sky-300"
               detail={difference === 0 ? 'Same as previous day' : (difference > 0 ? '+' : '−') + Math.abs(difference) + ' vs previous day'} />
             <MetricCard label="Reached" value={stats.outcomes[0]} icon={PhoneCall} tone="bg-emerald-500/10 text-emerald-300"
               detail={percent(stats.outcomes[0], total) + '% with a reached outcome'} />
             <MetricCard label="Active reps" value={stats.active} icon={Users} tone="bg-violet-500/10 text-violet-300"
-              detail={'Of ' + data.roster.size + ' on the Inside Sales roster'} />
+              detail={'Of ' + data.roster.size + ' on the POS roster'} />
             <MetricCard label="Meetings booked" value={stats.booked} icon={CalendarDays} tone="bg-amber-500/10 text-amber-300"
               detail="Calls marked Meeting Scheduled" />
           </div>
@@ -300,7 +306,7 @@ export default function InsideSalesDashboard() {
               <table className="w-full min-w-[570px] text-left text-sm">
                 <thead className="border-y border-white/5 bg-slate-900/70 text-xs font-medium text-slate-400">
                   <tr>
-                    <th scope="col" className="px-5 py-3">Inside Sales rep</th>
+                    <th scope="col" className="px-5 py-3">POS rep</th>
                     <th scope="col" className="px-3 py-3 text-right">Calls</th>
                     <th scope="col" className="px-3 py-3 text-right">Reached</th>
                     <th scope="col" className="px-3 py-3 text-right">Booked</th>
@@ -342,7 +348,7 @@ export default function InsideSalesDashboard() {
                 <p className="mt-1 text-xs text-slate-400">{dayLabel} · {callRows.length} {callRows.length === 1 ? 'call' : 'calls'}</p>
               </div>
               <select aria-label="Filter call log by rep" value={repFilter} onChange={event => selectRep(event.target.value)} className={CONTROL + ' max-w-full'}>
-                <option value="">All Inside Sales reps</option>
+                <option value="">All POS reps</option>
                 {stats.contributions.map(rep => <option key={rep.id} value={rep.id}>{rep.name}</option>)}
               </select>
             </div>
