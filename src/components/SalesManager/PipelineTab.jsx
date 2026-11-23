@@ -475,6 +475,8 @@ export default function PipelineTab() {
 
   // Merge lists to build dynamic unified rows — matches mobile app's buildLeadRows pattern
   const buildUnifiedPipeline = (leads, allCust, assignedCust, moms) => {
+    const normalizeCompanyName = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
     // 1. Build customer ID set and lookup maps
     const userCustomerIds = new Set(assignedCust.map(getCustomerRecordId).filter(Boolean));
     const customerMap = {};
@@ -509,11 +511,15 @@ export default function PipelineTab() {
     });
 
     const latestMomByCustomer = {};
+    const latestMomByCompany = {};
     sortedMoms.forEach((mom) => {
       const customerId = getMomCustomerId(mom);
       if (customerId && userCustomerIds.has(customerId)) {
         latestMomByCustomer[customerId] = mom;
       }
+
+      const companyKey = normalizeCompanyName(mom?.companyName || mom?.company_name || mom?.customerName || mom?.customer_name);
+      if (companyKey) latestMomByCompany[companyKey] = mom;
     });
 
     // 3. Resolve a lead's customer ID via direct ID or fuzzy company name match
@@ -524,6 +530,15 @@ export default function PipelineTab() {
       const mappedId = companyToId[compName];
       if (mappedId && userCustomerIds.has(mappedId)) return mappedId;
       return '';
+    };
+
+    const findMomFor = (entity, customerId) => {
+      if (customerId && latestMomByCustomer[customerId]) return latestMomByCustomer[customerId];
+      const companyKey = normalizeCompanyName(
+        entity?.company || entity?.companyName || entity?.customerName || entity?.accountName ||
+        entity?.company_name || entity?.customer_name
+      );
+      return companyKey ? latestMomByCompany[companyKey] || null : null;
     };
 
     // 4. Shared row builder
@@ -561,7 +576,10 @@ export default function PipelineTab() {
       const stage = lead ? getStageFromLead(lead, mom) : mom ? getStageFromMom(mom) : 'NEW_LEAD';
 
       // Deal value: lead first, then MOM budget fallback (matching mobile app)
-      const rawBudget = lead?.dealValue || lead?.value || lead?.budget || pitch?.budget || mom?.budget || '';
+      const momBudget = [pitch?.budget, mom?.budget].find((value) => (
+        value != null && String(value).trim() && String(value).trim().toLowerCase() !== 'tbd'
+      ));
+      const rawBudget = momBudget || lead?.dealValue || lead?.value || lead?.budget || '';
       const dealValNum = parseBudgetToCr(rawBudget);
 
       const followUpStr = lead?.expectedCloseDate || outcome?.follow_up_date || mom?.follow_up_date || customer?.followUpDate || customer?.nextMeetingDate || '';
@@ -590,6 +608,7 @@ export default function PipelineTab() {
 
       return {
         id: id,
+        customerId: getCustomerRecordId(customer) || getMomCustomerId(mom) || getLeadCustomerId(lead) || '',
         leadId: lead?.id || lead?.leadId || lead?.lead_id || '',
         leadData: lead,
         momId: mom?.id || '',
@@ -624,7 +643,7 @@ export default function PipelineTab() {
     leads.forEach((lead, idx) => {
       const customerId = resolveLeadCustomerId(lead) || `unknown-${idx}`;
       const customer = customerMap[customerId] || { companyName: lead?.company || lead?.companyName, customerType: 'Lead' };
-      const matchedMom = latestMomByCustomer[customerId] || null;
+      const matchedMom = findMomFor(lead, customerId);
 
       customersWithLeadRows.add(customerId);
       rows.push(createRow(lead.id || `lead-${idx}`, lead, customer, matchedMom, idx));
@@ -634,7 +653,7 @@ export default function PipelineTab() {
     let momOnlyCount = 0;
     Object.entries(customerMap).forEach(([customerId, customer]) => {
       if (customersWithLeadRows.has(customerId)) return;
-      const mom = latestMomByCustomer[customerId];
+      const mom = latestMomByCustomer[customerId] || findMomFor(customer, customerId);
       if (mom) {
         rows.push(createRow(`mom-${customerId}-${mom.id || 'latest'}`, null, customer, mom, 0));
         momOnlyCount++;
@@ -753,7 +772,11 @@ export default function PipelineTab() {
     e.preventDefault();
     try {
       setIsLoading(true);
+      const momCustomerId = selectedLead?.customerId ||
+        getLeadCustomerId(selectedLead?.leadData) ||
+        getMomCustomerId(selectedLead?.momData);
       const payload = {
+        ...(momCustomerId ? { account_id: String(momCustomerId) } : {}),
         companyName: selectedLead?.company || '',
         contactPersonName: selectedLead?.contactName || '',
         momDescription: momNotes,
