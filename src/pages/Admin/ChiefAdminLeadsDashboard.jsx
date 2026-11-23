@@ -189,8 +189,10 @@ const resolvePipelineOwner = (lead, mom, customer, userNameMap, users) => {
     customer?.userId || customer?.user_id || customer?.assignedTo || ''
   ).trim();
 
+  const momUserName = String(mom?.userName || mom?.username || '').trim();
   const pitchedByWhom = mom?.pitch_details?.pitched_by_whom || mom?.competition_and_history?.pitched_by_whom ||
-    mom?.pitchedByWhom || mom?.pitched_by_whom || customer?.salesPerson || customer?.contactPersonName || '';
+    mom?.pitchByWhom || mom?.pitch_by_whom || mom?.pitchedByWhom || mom?.pitched_by_whom ||
+    (momUserName.toLowerCase() !== 'unknown' ? momUserName : '') || customer?.salesPerson || '';
 
   let owner = userNameMap[ownerId];
   if (!owner && pitchedByWhom) {
@@ -200,13 +202,20 @@ const resolvePipelineOwner = (lead, mom, customer, userNameMap, users) => {
       const last = user.lastName || user.lastname || user.last_name || '';
       return `${first} ${last}`.trim() || user.fullName || user.username || user.email || '';
     };
-    const matchedUser = users.find(user => getName(user) === pitchOwner) ||
-      users.find(user => getName(user).toLowerCase() === pitchOwner.toLowerCase());
+    const normalizedPitchOwner = pitchOwner.toLowerCase().replace(/\s+/g, ' ');
+    const exactMatch = users.find(user => getName(user).trim().toLowerCase().replace(/\s+/g, ' ') === normalizedPitchOwner);
+    const partialMatches = users.filter(user => {
+      const normalizedName = getName(user).trim().toLowerCase().replace(/\s+/g, ' ');
+      return normalizedName.startsWith(`${normalizedPitchOwner} `) || normalizedPitchOwner.startsWith(`${normalizedName} `);
+    });
+    const matchedUser = exactMatch || (partialMatches.length === 1 ? partialMatches[0] : null);
     if (matchedUser) {
       const matchedId = String(matchedUser.id || matchedUser.userId || matchedUser.user_id || '').trim();
       return { ownerId: matchedId || ownerId, owner: userNameMap[matchedId] || pitchOwner };
     }
-    owner = pitchOwner;
+    if (!['test', 'unknown', 'unassigned', 'n/a'].includes(normalizedPitchOwner)) {
+      owner = pitchOwner;
+    }
   }
 
   return { ownerId, owner: owner || 'Unassigned' };
@@ -335,6 +344,36 @@ export default function ChiefAdminLeadsDashboard() {
         return true;
       });
 
+      const salesTeams = [
+        { label: 'Sales Managers', users: extractList(managersRes) },
+        { label: 'Inside Sales', users: extractList(insideSalesRes) },
+      ];
+      const knownUsersById = new Map(
+        cleanUsers
+          .map(user => [String(user.id || user.userId || user.user_id || '').trim(), user])
+          .filter(([id]) => id)
+      );
+      salesTeams.forEach(({ users }) => {
+        users.forEach(user => {
+          const ownerId = String(user?.id || user?.userId || user?.user_id || user?.salesPersonId || user?.salespersonId || '').trim();
+          const firstName = user?.firstName || user?.firstname || user?.first_name || '';
+          const lastName = user?.lastName || user?.lastname || user?.last_name || '';
+          const fullName = `${firstName} ${lastName}`.trim() || user?.fullName || user?.name || user?.salesPersonName || user?.userName || user?.username || user?.email || '';
+          if (!ownerId || !fullName || isPocOwner({ ownerId, owner: fullName })) return;
+          const existingUser = knownUsersById.get(ownerId);
+          knownUsersById.set(ownerId, {
+            ...user,
+            ...existingUser,
+            id: ownerId,
+            fullName: existingUser?.fullName || fullName,
+            firstName: existingUser?.firstName || firstName,
+            lastName: existingUser?.lastName || lastName,
+          });
+        });
+      });
+      const knownUsers = Array.from(knownUsersById.values());
+      const knownUserIds = new Set(knownUsers.map(user => String(user.id || user.userId || user.user_id || '').trim()));
+
       const cleanLeads = (Array.isArray(rawLeads) ? rawLeads : [])
         .filter(lead => lead && typeof lead === 'object')
         .map(lead => ({
@@ -343,15 +382,9 @@ export default function ChiefAdminLeadsDashboard() {
         }))
         .filter(lead => {
           const uId = String(lead.userId || '');
-          if (!uId) return true;
-          if (cleanUsers.length === 0) return true;
-          return cleanUsers.some(u => u && String(u.id || u.userId || u.user_id || '') === uId);
+          return !uId || knownUserIds.size === 0 || knownUserIds.has(uId);
         });
 
-      const salesTeams = [
-        { label: 'Sales Managers', users: extractList(managersRes) },
-        { label: 'Inside Sales', users: extractList(insideSalesRes) },
-      ];
       const salesPeople = new Map();
       for (const { label, users } of salesTeams) {
         for (const user of users) {
@@ -372,7 +405,7 @@ export default function ChiefAdminLeadsDashboard() {
       })));
       setListRepFilter(current => salesPeople.has(current) ? current : 'ALL');
       setAllLeads(cleanLeads);
-      setAllUsers(cleanUsers);
+      setAllUsers(knownUsers);
       setActiveOutsiders(Array.isArray(rawOutsiders) ? rawOutsiders : []);
       setAllMoms(Array.isArray(rawMoms) ? rawMoms : []);
       setAllCustomers(Array.isArray(rawCustomers) ? rawCustomers : []);

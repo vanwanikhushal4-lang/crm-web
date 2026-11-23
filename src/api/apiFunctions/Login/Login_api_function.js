@@ -200,6 +200,16 @@ export const getTaskLogs = async () => {
   }
 };
 
+export const deleteTaskLog = async (id) => {
+  try {
+    const res = await apiMethods.delete(`/TaskLog/deleteTaskLog/${id}`);
+    return res;
+  } catch (error) {
+    console.error('Delete TaskLog API Error:', error);
+    throw error;
+  }
+};
+
 export const saveMeetingLog = async (payload) => {
   try {
     const res = await apiMethods.post(`${CUSTOMER_MASTER_BASE_URL}/customerMaster/saveMeetingLog`, payload);
@@ -226,6 +236,16 @@ export const getCalls = async () => {
     return res;
   } catch (error) {
     console.error('Get Calls API Error:', error);
+    throw error;
+  }
+};
+
+export const deleteCall = async (id) => {
+  try {
+    const res = await apiMethods.delete(`/Call/deleteCall/${id}`);
+    return res;
+  } catch (error) {
+    console.error('Delete Call API Error:', error);
     throw error;
   }
 };
@@ -262,6 +282,16 @@ export const getAllMeetingLogs = async () => {
     return res;
   } catch (error) {
     console.error('Get All Meeting Logs API Error:', error);
+    throw error;
+  }
+};
+
+export const deleteMeetingLog = async (id) => {
+  try {
+    const res = await apiMethods.delete(`${CUSTOMER_MASTER_BASE_URL}/customerMaster/deleteMeetingLog/${id}`);
+    return res;
+  } catch (error) {
+    console.error('Delete Meeting Log API Error:', error);
     throw error;
   }
 };

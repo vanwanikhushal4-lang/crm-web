@@ -1049,7 +1049,6 @@ export default function PipelineTab() {
   const STAGES_PILLS = [
     'All stages',
     'Initial Contact',
-    'RFP',
     'Tech Discussion',
     'Demo',
     'Proposal',
@@ -1066,9 +1065,6 @@ export default function PipelineTab() {
 
     if (lowerPill === 'initial contact') {
       return lowerStage === 'new_lead' || lowerStage === 'contacted' || lowerStage.includes('initial');
-    }
-    if (lowerPill === 'rfp') {
-      return lowerStage === 'rfp';
     }
     if (lowerPill === 'tech discussion') {
       return lowerStage === 'qualified' || lowerStage.includes('discussion') || lowerStage.includes('tech');
@@ -1978,7 +1974,6 @@ export default function PipelineTab() {
                   >
                     <option value="NEW_LEAD">New Lead</option>
                     <option value="CONTACTED">Contacted</option>
-                    <option value="RFP">RFP</option>
                     <option value="QUALIFIED">Qualified</option>
                     <option value="PROPOSAL_SENT">Proposal Sent</option>
                     <option value="NEGOTIATION">Negotiation</option>
@@ -2265,7 +2260,6 @@ export default function PipelineTab() {
                   {[
                     { label: 'New Lead', value: 'NEW_LEAD', color: 'hover:bg-slate-800 hover:text-slate-200 border-white/5 text-slate-400' },
                     { label: 'Contacted', value: 'CONTACTED', color: 'hover:bg-blue-600/10 hover:border-blue-500/20 hover:text-blue-300 border-white/5 text-slate-400' },
-                    { label: 'RFP', value: 'RFP', color: 'hover:bg-cyan-600/10 hover:border-cyan-500/20 hover:text-cyan-300 border-white/5 text-slate-400' },
                     { label: 'Qualified', value: 'QUALIFIED', color: 'hover:bg-indigo-600/10 hover:border-indigo-500/20 hover:text-indigo-300 border-white/5 text-slate-400' },
                     { label: 'Proposal Sent', value: 'PROPOSAL_SENT', color: 'hover:bg-amber-600/10 hover:border-amber-500/20 hover:text-amber-300 border-white/5 text-slate-400' },
                     { label: 'Negotiation', value: 'NEGOTIATION', color: 'hover:bg-purple-600/10 hover:border-purple-500/20 hover:text-purple-300 border-white/5 text-slate-400' },

@@ -22,7 +22,8 @@ import {
   Loader,
   Upload,
   FileSpreadsheet,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 
 import {
@@ -31,9 +32,12 @@ import {
   getAllMeetingLogs,
   getTaskLogs,
   getCalls,
+  deleteCall,
+  deleteMeetingLog,
   saveMeetingLog,
   meetingCheckIn,
   saveOrUpdateTaskLog,
+  deleteTaskLog,
   saveOrUpdateCall,
   importCallsExcel,
   exportCallsExcel,
@@ -181,6 +185,9 @@ export default function CalendarTab() {
   const [customers, setCustomers] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [deletingMeetingId, setDeletingMeetingId] = useState(null);
+  const [deletingCallId, setDeletingCallId] = useState(null);
   const [calls, setCalls] = useState([]);
   const [isImportingCalls, setIsImportingCalls] = useState(false);
   const [isExportingCalls, setIsExportingCalls] = useState(false);
@@ -714,6 +721,57 @@ export default function CalendarTab() {
       fetchData();
     } catch (error) {
       alert('Error saving task: ' + (error?.response?.data?.message || error.message));
+    }
+  };
+
+  const handleDeleteTask = async (task, e) => {
+    e?.stopPropagation();
+    const taskId = task?.id || task?.taskLogId;
+    if (!taskId || deletingTaskId) return;
+    if (!window.confirm(`Delete task "${task.subject || 'this task'}"? This cannot be undone.`)) return;
+
+    setDeletingTaskId(String(taskId));
+    try {
+      await deleteTaskLog(taskId);
+      await fetchData();
+    } catch (error) {
+      alert('Failed to delete task: ' + (error?.response?.data?.message || error?.response?.data?.error || error.message));
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
+
+  const handleDeleteMeeting = async (meeting, e) => {
+    e?.stopPropagation();
+    const meetingId = meeting?.meetingLogId || meeting?.logId || meeting?.id;
+    if (!meetingId || deletingMeetingId) return;
+    if (!window.confirm(`Delete meeting "${meeting.companyName || meeting.name || 'this meeting'}"? This cannot be undone.`)) return;
+
+    setDeletingMeetingId(String(meetingId));
+    try {
+      await deleteMeetingLog(meetingId);
+      await fetchData();
+    } catch (error) {
+      alert('Failed to delete meeting: ' + (error?.response?.data?.message || error?.response?.data?.error || error.message));
+    } finally {
+      setDeletingMeetingId(null);
+    }
+  };
+
+  const handleDeleteCall = async (call, e) => {
+    e?.stopPropagation();
+    const callId = call?.id || call?.callId;
+    if (!callId || deletingCallId) return;
+    if (!window.confirm(`Delete call "${call.subject || 'this call'}"? This cannot be undone.`)) return;
+
+    setDeletingCallId(String(callId));
+    try {
+      await deleteCall(callId);
+      await fetchData();
+    } catch (error) {
+      alert('Failed to delete call: ' + (error?.response?.data?.message || error?.response?.data?.error || error.message));
+    } finally {
+      setDeletingCallId(null);
     }
   };
 
@@ -1420,25 +1478,39 @@ export default function CalendarTab() {
 
                             {/* Action */}
                             <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                              {momDone ? (
-                                <span className="text-xs text-emerald-400 font-semibold inline-flex items-center gap-1">
-                                  MOM Submitted ✓
-                                </span>
-                              ) : (
+                              <div className="inline-flex items-center justify-end gap-2">
+                                {momDone ? (
+                                  <span className="text-xs text-emerald-400 font-semibold inline-flex items-center gap-1">
+                                    MOM Submitted ✓
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedMeeting(meeting);
+                                      fetchAttachments(meeting);
+                                      setShowActionOverlay(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-blue-400 hover:text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
+                                  >
+                                    <span>Log MOM / Check In</span>
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                                 <button
                                   type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedMeeting(meeting);
-                                    fetchAttachments(meeting);
-                                    setShowActionOverlay(true);
-                                  }}
-                                  className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-blue-400 hover:text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
+                                  onClick={(e) => handleDeleteMeeting(meeting, e)}
+                                  disabled={deletingMeetingId === String(meeting.meetingLogId || meeting.logId || meeting.id)}
+                                  className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white disabled:opacity-50 transition"
+                                  title="Delete meeting log"
+                                  aria-label={`Delete meeting ${meeting.companyName || meeting.name || ''}`}
                                 >
-                                  <span>Log MOM / Check In</span>
-                                  <ChevronRight className="h-3.5 w-3.5" />
+                                  {deletingMeetingId === String(meeting.meetingLogId || meeting.logId || meeting.id)
+                                    ? <Loader className="h-4 w-4 animate-spin" />
+                                    : <Trash2 className="h-4 w-4" />}
                                 </button>
-                              )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1571,24 +1643,38 @@ export default function CalendarTab() {
 
                           {/* Action Button */}
                           <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTaskForm({
-                                  id: task.id || task.taskLogId,
-                                  subject: task.subject || '',
-                                  dueDate: task.dueDate || getLocalDateString(selectedDate),
-                                  status: task.status || 'NOT_STARTED',
-                                  priority: task.priority || 'NORMAL'
-                                });
-                                setShowTaskModal(true);
-                              }}
-                              className="px-3 py-1.5 bg-emerald-600/10 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
-                            >
-                              <span>Edit Task</span>
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            </button>
+                            <div className="inline-flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTaskForm({
+                                    id: task.id || task.taskLogId,
+                                    subject: task.subject || '',
+                                    dueDate: task.dueDate || getLocalDateString(selectedDate),
+                                    status: task.status || 'NOT_STARTED',
+                                    priority: task.priority || 'NORMAL'
+                                  });
+                                  setShowTaskModal(true);
+                                }}
+                                className="px-3 py-1.5 bg-emerald-600/10 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
+                              >
+                                <span>Edit Task</span>
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteTask(task, e)}
+                                disabled={deletingTaskId === String(task.id || task.taskLogId)}
+                                className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white disabled:opacity-50 transition"
+                                title="Delete task"
+                                aria-label={`Delete task ${task.subject || ''}`}
+                              >
+                                {deletingTaskId === String(task.id || task.taskLogId)
+                                  ? <Loader className="h-4 w-4 animate-spin" />
+                                  : <Trash2 className="h-4 w-4" />}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1765,9 +1851,23 @@ export default function CalendarTab() {
 
                           {/* Result Outcome */}
                           <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                            <span className="text-[10px] font-semibold bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-white/5">
-                              Result: {(call.callResult || 'NONE').replace(/_/g, ' ')}
-                            </span>
+                            <div className="inline-flex items-center justify-end gap-2">
+                              <span className="text-[10px] font-semibold bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-white/5">
+                                Result: {(call.callResult || 'NONE').replace(/_/g, ' ')}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteCall(call, e)}
+                                disabled={deletingCallId === String(call.id || call.callId)}
+                                className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white disabled:opacity-50 transition"
+                                title="Delete call"
+                                aria-label={`Delete call ${call.subject || ''}`}
+                              >
+                                {deletingCallId === String(call.id || call.callId)
+                                  ? <Loader className="h-4 w-4 animate-spin" />
+                                  : <Trash2 className="h-4 w-4" />}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
