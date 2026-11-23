@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Headphones, Phone,
+  CalendarDays, ChevronLeft, ChevronRight, Phone,
   PhoneCall, RefreshCw, Users,
 } from 'lucide-react';
 import { fetchInsideSalesList } from '../../api/Admin/SalespersonApi';
@@ -216,14 +216,9 @@ export default function InsideSalesDashboard() {
   return (
     <section aria-labelledby="inside-sales-heading" className="mx-auto max-w-[1440px] space-y-5 animate-fade">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 p-3 text-sky-300">
-            <Headphones size={26} aria-hidden="true" />
-          </div>
-          <div>
-            <h1 id="inside-sales-heading" className="text-2xl font-bold tracking-tight text-white">Inside Sales Calling</h1>
-            <p className="mt-1 text-sm text-slate-400">Daily call activity and team contributions</p>
-          </div>
+        <div>
+          <h1 id="inside-sales-heading" className="text-2xl font-bold tracking-tight text-white">Inside Sales Calling</h1>
+          <p className="mt-1 text-sm text-slate-400">Daily call activity and team contributions</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" aria-label="Previous day" className={CONTROL} onClick={() => selectDay(shiftDay(day, -1))}><ChevronLeft size={17} /></button>
