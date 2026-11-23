@@ -2688,6 +2688,7 @@ export default function CalendarTab() {
                           className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition"
                         >
                           <option value="Technical Discussion">Technical Discussion</option>
+                          <option value="RFP">RFP</option>
                           <option value="Demo">Demo</option>
                           <option value="POC Request">POC Request</option>
                           <option value="Proposal">Proposal</option>

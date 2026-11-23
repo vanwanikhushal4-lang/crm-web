@@ -143,6 +143,7 @@ export const getStageFromMom = (mom) => {
 
   if (nextStep.includes('lost') || nextStep.includes('reject') || nextStep.includes('not interested')) return 'LOST';
   if (nextStep.includes('won') || nextStep.includes('closed') || nextStep.includes('closure')) return 'WON';
+  if (nextStep === 'rfp' || nextStep.includes('request for proposal')) return 'RFP';
   if (nextStep.includes('negotiation')) return 'NEGOTIATION';
   if (nextStep.includes('proposal') || nextStep.includes('commercial')) return 'PROPOSAL_SENT';
   if (nextStep.includes('demo') || nextStep.includes('poc') || nextStep.includes('qualified')) return 'QUALIFIED';
@@ -167,6 +168,7 @@ export const getStageFromLead = (lead, fallbackMom) => {
     NEW_LEAD: 'NEW_LEAD',
     INITIAL_CONTACT: 'NEW_LEAD',
     CONTACTED: 'CONTACTED',
+    RFP: 'RFP',
     TECH_DISCUSSION: 'TECH_DISCUSSION',
     QUALIFIED: 'QUALIFIED',
     DEMO: 'QUALIFIED',
@@ -1047,6 +1049,7 @@ export default function PipelineTab() {
   const STAGES_PILLS = [
     'All stages',
     'Initial Contact',
+    'RFP',
     'Tech Discussion',
     'Demo',
     'Proposal',
@@ -1063,6 +1066,9 @@ export default function PipelineTab() {
 
     if (lowerPill === 'initial contact') {
       return lowerStage === 'new_lead' || lowerStage === 'contacted' || lowerStage.includes('initial');
+    }
+    if (lowerPill === 'rfp') {
+      return lowerStage === 'rfp';
     }
     if (lowerPill === 'tech discussion') {
       return lowerStage === 'qualified' || lowerStage.includes('discussion') || lowerStage.includes('tech');
@@ -1191,7 +1197,7 @@ export default function PipelineTab() {
   const KANBAN_COLUMNS = [
     { label: 'Leads / Initial Contact', key: 'initial', dbStages: ['NEW_LEAD', 'CONTACTED'] },
     { label: 'Technical Discussion / Qualified', key: 'qualified', dbStages: ['QUALIFIED'] },
-    { label: 'Proposals / Negotiations', key: 'proposals', dbStages: ['PROPOSAL_SENT', 'NEGOTIATION'] }
+    { label: 'RFP / Proposals / Negotiations', key: 'proposals', dbStages: ['RFP', 'PROPOSAL_SENT', 'NEGOTIATION'] }
   ];
 
   const getKanbanColumnLeads = (dbStages) => {
@@ -1972,6 +1978,7 @@ export default function PipelineTab() {
                   >
                     <option value="NEW_LEAD">New Lead</option>
                     <option value="CONTACTED">Contacted</option>
+                    <option value="RFP">RFP</option>
                     <option value="QUALIFIED">Qualified</option>
                     <option value="PROPOSAL_SENT">Proposal Sent</option>
                     <option value="NEGOTIATION">Negotiation</option>
@@ -2027,8 +2034,8 @@ export default function PipelineTab() {
                     onChange={(e) => setLeadForm({ ...leadForm, leadSource: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
                   >
-                    {['PARTNER_REFERAL', 'DIRECT', 'INBOUND_WEBSITE', 'EVENT_TRADESHOW', 'COLD_OUTREACH', 'LINKEDIN', 'EXISTING_CUSTOMER', 'OTHER'].map((src) => (
-                      <option key={src} value={src}>{src.replace('_', ' ')}</option>
+                    {['PARTNER_REFERAL', 'DIRECT', 'RFP', 'INBOUND_WEBSITE', 'EVENT_TRADESHOW', 'COLD_OUTREACH', 'LINKEDIN', 'EXISTING_CUSTOMER', 'OTHER'].map((src) => (
+                      <option key={src} value={src}>{src.replace(/_/g, ' ')}</option>
                     ))}
                   </select>
                 </div>
@@ -2258,6 +2265,7 @@ export default function PipelineTab() {
                   {[
                     { label: 'New Lead', value: 'NEW_LEAD', color: 'hover:bg-slate-800 hover:text-slate-200 border-white/5 text-slate-400' },
                     { label: 'Contacted', value: 'CONTACTED', color: 'hover:bg-blue-600/10 hover:border-blue-500/20 hover:text-blue-300 border-white/5 text-slate-400' },
+                    { label: 'RFP', value: 'RFP', color: 'hover:bg-cyan-600/10 hover:border-cyan-500/20 hover:text-cyan-300 border-white/5 text-slate-400' },
                     { label: 'Qualified', value: 'QUALIFIED', color: 'hover:bg-indigo-600/10 hover:border-indigo-500/20 hover:text-indigo-300 border-white/5 text-slate-400' },
                     { label: 'Proposal Sent', value: 'PROPOSAL_SENT', color: 'hover:bg-amber-600/10 hover:border-amber-500/20 hover:text-amber-300 border-white/5 text-slate-400' },
                     { label: 'Negotiation', value: 'NEGOTIATION', color: 'hover:bg-purple-600/10 hover:border-purple-500/20 hover:text-purple-300 border-white/5 text-slate-400' },
@@ -2337,6 +2345,7 @@ export default function PipelineTab() {
                 <div className="flex flex-col gap-2 pt-1 max-h-[45vh] overflow-y-auto pr-1 hide-scrollbar">
                   {[
                     { label: 'Technical Discussion', value: 'Technical Discussion', color: 'hover:bg-blue-600/10 hover:border-blue-500/20 hover:text-blue-300 border-white/5 text-slate-400' },
+                      { label: 'RFP', value: 'RFP', color: 'hover:bg-cyan-600/10 hover:border-cyan-500/20 hover:text-cyan-300 border-white/5 text-slate-400' },
                     { label: 'Demo', value: 'Demo', color: 'hover:bg-indigo-600/10 hover:border-indigo-500/20 hover:text-indigo-300 border-white/5 text-slate-400' },
                     { label: 'POC Request', value: 'POC Request', color: 'hover:bg-purple-600/10 hover:border-purple-500/20 hover:text-purple-300 border-white/5 text-slate-400' },
                     { label: 'Proposal', value: 'Proposal', color: 'hover:bg-amber-600/10 hover:border-amber-500/20 hover:text-amber-300 border-white/5 text-slate-400' },
@@ -2610,6 +2619,7 @@ export default function PipelineTab() {
                       className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 transition"
                     >
                       <option value="Technical Discussion">Technical Discussion</option>
+                      <option value="RFP">RFP</option>
                       <option value="Demo">Demo</option>
                       <option value="POC Request">POC Request</option>
                       <option value="Proposal">Proposal</option>
