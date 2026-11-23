@@ -29,6 +29,15 @@ import {
 import { fetchSalesPersonList, fetchInsideSalesList } from '../../api/Admin/SalespersonApi';
 import RunningNumber from '../../components/common/RunningNumber';
 
+const PIPELINE_TABS = {
+  DASHBOARD: { label: 'Dashboard Summary', Icon: TrendingUp },
+  HOT: { label: 'Hot Leads', Icon: Flame, badge: 'HOT DEAL', color: '#f43f5e', rgb: '244, 63, 94' },
+  WARM: { label: 'Warm Leads', Icon: Sun, badge: 'WARM DEAL', color: '#fbbf24', rgb: '245, 158, 11' },
+  NEXT_MONTH: { label: 'Closing Next Month', Icon: Calendar, color: '#38bdf8', rgb: '56, 189, 248' },
+  WON: { label: 'Won Leads', Icon: CheckCircle2, badge: 'WON DEAL', color: '#10b981', rgb: '16, 185, 129' },
+  LOST: { label: 'Lost Leads', Icon: XCircle, badge: 'LOST DEAL', color: '#ef4444', rgb: '239, 68, 68' },
+};
+
 // Safe list extraction helper to match nested database schemas
 const extractList = (response) => {
   const candidates = [
@@ -149,6 +158,22 @@ const isPocOwner = ({ ownerId, owner }) => {
   });
 };
 
+const getCalendarMonthIndex = (value) => {
+  const dateParts = typeof value === 'string' && value.trim().match(/^(\d{4})-(0[1-9]|1[0-2])(?:-|$)/);
+  if (dateParts) return Number(dateParts[1]) * 12 + Number(dateParts[2]) - 1;
+  const date = new Date(value);
+  return date.getFullYear() * 12 + date.getMonth();
+};
+
+function ClosingNextMonthTag() {
+  return (
+    <span className="mb-2 inline-flex items-center gap-1 rounded border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-xs font-semibold text-sky-300">
+      <Calendar size={12} aria-hidden="true" />
+      Closing Next Month
+    </span>
+  );
+}
+
 const resolvePipelineOwner = (lead, mom, customer, userNameMap, users) => {
   const leadOwnerId = String(
     lead?.assignedTo || lead?.userId || lead?.user_id || lead?.createdBy || lead?.salesmanId || ''
@@ -189,7 +214,7 @@ const resolvePipelineOwner = (lead, mom, customer, userNameMap, users) => {
 
 export default function ChiefAdminLeadsDashboard() {
   // Tab and Filters State
-  const [activeTab, setActiveTab] = useState('DASHBOARD'); // 'DASHBOARD' | 'HOT' | 'WARM'
+  const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [selectedRep, setSelectedRep] = useState('All Team Members');
   const [listRepFilter, setListRepFilter] = useState('ALL');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL'); // 'ALL' | 'SALES_MANAGER' | 'OUTSIDER'
@@ -412,15 +437,11 @@ export default function ChiefAdminLeadsDashboard() {
 
   // Month navigation handlers
   const handlePrevMonth = () => {
-    const prev = new Date(selectedDate);
-    prev.setMonth(prev.getMonth() - 1);
-    setSelectedDate(prev);
+    setSelectedDate(date => new Date(date.getFullYear(), date.getMonth() - 1, 1));
   };
 
   const handleNextMonth = () => {
-    const next = new Date(selectedDate);
-    next.setMonth(next.getMonth() + 1);
-    setSelectedDate(next);
+    setSelectedDate(date => new Date(date.getFullYear(), date.getMonth() + 1, 1));
   };
 
   const getYearMonthString = (date) => {
@@ -553,8 +574,9 @@ export default function ChiefAdminLeadsDashboard() {
     });
   }, [allLeads, allCustomers, allMoms, userNameMap, allUsers]);
 
-  // 2. Map raw API leads and MOM details to normalized UI records and filter by the selected month
+  // 2. Include the selected month's records and open leads with a next-month close date.
   const mappedLeads = useMemo(() => {
+    const selectedMonth = getCalendarMonthIndex(selectedDate);
     return unifiedLeads
       .map(({ lead, mom, customer, isMomOnly, ownerId, owner }) => {
         const pitch = mom?.pitch_details || {};
@@ -586,7 +608,10 @@ export default function ChiefAdminLeadsDashboard() {
         else if (hot) priority = 'Hot';
         else if (warm) priority = 'Warm';
 
-        const date = lead?.expectedCloseDate || lead?.expected_close_date || outcome?.follow_up_date || mom?.follow_up_date || mom?.meetingDate || mom?.createdAt || lead?.createdAt || '';
+        const expectedCloseDate = lead?.expectedCloseDate || lead?.expected_close_date || '';
+        const date = expectedCloseDate || outcome?.follow_up_date || mom?.follow_up_date || mom?.meetingDate || mom?.createdAt || lead?.createdAt || '';
+        const isClosingNextMonth = Boolean(expectedCloseDate) && !won && !lost &&
+          getCalendarMonthIndex(expectedCloseDate) === selectedMonth + 1;
 
         return {
           ...(lead || {}),
@@ -603,30 +628,15 @@ export default function ChiefAdminLeadsDashboard() {
           isHot: hot,
           isWarm: warm,
           isMomOnly,
+          expectedCloseDate,
+          isClosingNextMonth,
           date,
           leadData: lead,
           momData: mom,
           customerData: customer
         };
       })
-      .filter(item => {
-        if (!item.date) return true;
-        if (typeof item.date === 'string' && item.date.includes('-')) {
-          const cleanStr = item.date.split('T')[0].trim();
-          const parts = cleanStr.split('-');
-          if (parts.length >= 2) {
-            const year = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            if (!isNaN(year) && !isNaN(month)) {
-              return year === selectedDate.getFullYear() && month === selectedDate.getMonth();
-            }
-          }
-        }
-        const d = new Date(item.date);
-        return !isNaN(d.getTime()) && 
-               d.getFullYear() === selectedDate.getFullYear() && 
-               d.getMonth() === selectedDate.getMonth();
-      });
+      .filter(item => !item.date || item.isClosingNextMonth || getCalendarMonthIndex(item.date) === selectedMonth);
   }, [unifiedLeads, selectedDate]);
 
   // Subset filters
@@ -838,7 +848,7 @@ export default function ChiefAdminLeadsDashboard() {
     ];
 
     filteredLeadsForCharts.forEach(l => {
-      if (!l.date) return;
+      if (!l.date || l.isClosingNextMonth) return;
       const d = new Date(l.date);
       if (isNaN(d.getTime())) return;
       const day = d.getDate();
@@ -1199,13 +1209,13 @@ export default function ChiefAdminLeadsDashboard() {
     }));
   };
 
-  // Filtered lists for Hot / Warm / Won / Lost Leads tabs
-  const getFilteredList = (temperature) => {
+  const getFilteredList = (tab) => {
     let filtered = mappedLeads.filter(lead => {
-      if (temperature === 'HOT') return lead.isHot && !lead.isWon && !lead.isLost;
-      if (temperature === 'WARM') return lead.isWarm && !lead.isWon && !lead.isLost;
-      if (temperature === 'WON') return lead.isWon;
-      if (temperature === 'LOST') return lead.isLost;
+      if (tab === 'HOT') return lead.isHot && !lead.isWon && !lead.isLost;
+      if (tab === 'WARM') return lead.isWarm && !lead.isWon && !lead.isLost;
+      if (tab === 'WON') return lead.isWon;
+      if (tab === 'LOST') return lead.isLost;
+      if (tab === 'NEXT_MONTH') return lead.isClosingNextMonth;
       return false;
     });
 
@@ -1222,7 +1232,7 @@ export default function ChiefAdminLeadsDashboard() {
         const contactName = (l.contactName || '').toLowerCase();
         const product = (l.product || '').toLowerCase();
         const notes = (l.notes || '').toLowerCase();
-        const stage = (l.stage || '').toLowerCase();
+        const stage = String(l.stage || '').toLowerCase();
         const repName = l.owner.toLowerCase();
 
         return company.includes(query) || 
@@ -1237,10 +1247,8 @@ export default function ChiefAdminLeadsDashboard() {
     return filtered;
   };
 
-  const filteredHotLeads = getFilteredList('HOT');
-  const filteredWarmLeads = getFilteredList('WARM');
-  const filteredWonLeads = getFilteredList('WON');
-  const filteredLostLeads = getFilteredList('LOST');
+  const filteredLeads = activeTab === 'DASHBOARD' ? [] : getFilteredList(activeTab);
+  const { Icon: BadgeIcon, badge, color: themeColor, rgb: themeRgb } = PIPELINE_TABS[activeTab];
 
   return (
     <div className="animate-fade flex flex-col gap-6" style={{ width: '100%' }}>
@@ -1598,8 +1606,8 @@ export default function ChiefAdminLeadsDashboard() {
           </div>
 
           {/* Tab Menu Header */}
-          <div className="flex gap-6 mb-2 border-b border-white/10 pb-px" style={{ position: 'relative' }}>
-            {['DASHBOARD', 'HOT', 'WARM', 'WON', 'LOST'].map((tab) => (
+          <div className="flex flex-wrap gap-x-6 gap-y-2 mb-2 border-b border-white/10 pb-px" style={{ position: 'relative' }}>
+            {Object.entries(PIPELINE_TABS).map(([tab, { label, Icon }]) => (
               <button
                 key={tab}
                 className="pb-3 font-semibold text-[15px] transition-all relative"
@@ -1616,12 +1624,8 @@ export default function ChiefAdminLeadsDashboard() {
                 onClick={() => setActiveTab(tab)}
               >
                 <span className="flex items-center gap-2">
-                  {tab === 'DASHBOARD' && <TrendingUp size={16} />}
-                  {tab === 'HOT' && <Flame size={16} />}
-                  {tab === 'WARM' && <Sun size={16} />}
-                  {tab === 'WON' && <CheckCircle2 size={16} color="#10b981" />}
-                  {tab === 'LOST' && <XCircle size={16} color="#ef4444" />}
-                  {tab === 'DASHBOARD' ? 'Dashboard Summary' : (tab === 'HOT' ? 'Hot Leads' : (tab === 'WARM' ? 'Warm Leads' : (tab === 'WON' ? 'Won Leads' : 'Lost Leads')))}
+                  <Icon size={16} color={tab === 'WON' ? '#10b981' : tab === 'LOST' ? '#ef4444' : undefined} />
+                  {label}
                 </span>
                 {activeTab === tab && (
                   <div 
@@ -1958,6 +1962,7 @@ export default function ChiefAdminLeadsDashboard() {
                             <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                               {currentOwnerData.largestCompany}
                             </h3>
+                            {currentOwnerData.largestOpportunity?.isClosingNextMonth && <ClosingNextMonthTag />}
                             {currentOwnerData.largestOpportunity?.product && (
                               <p style={{ fontSize: '13px', color: '#60a5fa', fontWeight: '600' }}>Product: {currentOwnerData.largestOpportunity.product}</p>
                             )}
@@ -2096,7 +2101,7 @@ export default function ChiefAdminLeadsDashboard() {
             </div>
           )}
 
-          {(activeTab === 'HOT' || activeTab === 'WARM' || activeTab === 'WON' || activeTab === 'LOST') && (
+          {activeTab !== 'DASHBOARD' && (
             <div className="flex flex-col gap-6">
               
               {/* Search & Chip Sub-Filter */}
@@ -2177,12 +2182,7 @@ export default function ChiefAdminLeadsDashboard() {
 
               {/* Leads flat list */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(
-                  activeTab === 'HOT' ? filteredHotLeads :
-                  activeTab === 'WARM' ? filteredWarmLeads :
-                  activeTab === 'WON' ? filteredWonLeads :
-                  filteredLostLeads
-                ).length === 0 ? (
+                {filteredLeads.length === 0 ? (
                   <div className="glass-panel col-span-2 flex-col items-center justify-center text-center py-16" style={{ padding: '24px' }}>
                     <AlertCircle size={40} className="text-muted" style={{ opacity: 0.4, marginBottom: '12px' }} />
                     <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>No matching leads found</h4>
@@ -2191,16 +2191,9 @@ export default function ChiefAdminLeadsDashboard() {
                     </p>
                   </div>
                 ) : (
-                  (
-                    activeTab === 'HOT' ? filteredHotLeads :
-                    activeTab === 'WARM' ? filteredWarmLeads :
-                    activeTab === 'WON' ? filteredWonLeads :
-                    filteredLostLeads
-                  ).map((lead, idx) => {
+                  filteredLeads.map((lead, idx) => {
                     const leadId = lead.id || `lead-${idx}`;
                     const isExpanded = !!expandedLeads[leadId];
-                    const themeColor = activeTab === 'HOT' ? '#f43f5e' : (activeTab === 'WARM' ? '#fbbf24' : (activeTab === 'WON' ? '#10b981' : '#ef4444'));
-                    const themeRgb = activeTab === 'HOT' ? '244, 63, 94' : (activeTab === 'WARM' ? '245, 158, 11' : (activeTab === 'WON' ? '16, 185, 129' : '239, 68, 68'));
 
                     return (
                       <div 
@@ -2217,26 +2210,18 @@ export default function ChiefAdminLeadsDashboard() {
                         {/* Lead Card Header */}
                         <div className="flex justify-between items-start gap-4">
                           <div>
-                            <span 
-                              style={{ 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '4px', 
-                                padding: '2px 8px', 
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: '700',
-                                marginBottom: '8px',
-                                background: `rgba(${themeRgb}, 0.15)`,
-                                color: themeColor
-                              }}
-                            >
-                              {activeTab === 'HOT' && <Flame size={10} />}
-                              {activeTab === 'WARM' && <Sun size={10} />}
-                              {activeTab === 'WON' && <CheckCircle2 size={10} />}
-                              {activeTab === 'LOST' && <XCircle size={10} />}
-                              {activeTab === 'HOT' ? 'HOT DEAL' : (activeTab === 'WARM' ? 'WARM DEAL' : (activeTab === 'WON' ? 'WON DEAL' : 'LOST DEAL'))}
-                            </span>
+                            <div className="flex flex-wrap gap-x-2">
+                              {badge && (
+                                <span
+                                  className="mb-2 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold"
+                                  style={{ background: `rgba(${themeRgb}, 0.15)`, color: themeColor }}
+                                >
+                                  <BadgeIcon size={10} aria-hidden="true" />
+                                  {badge}
+                                </span>
+                              )}
+                              {lead.isClosingNextMonth && <ClosingNextMonthTag />}
+                            </div>
                             <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#fff' }}>{lead.company || 'Unknown Company'}</h3>
                           </div>
                           
