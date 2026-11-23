@@ -32,7 +32,6 @@ import {
   getTaskLogs,
   getCalls,
   saveMeetingLog,
-  schedulePlannedMeeting,
   meetingCheckIn,
   saveOrUpdateTaskLog,
   saveOrUpdateCall,
@@ -46,6 +45,61 @@ import {
   getAllProducts,
   getAllMomDetailsByCurrentUser
 } from '../../api/apiFunctions/Login/Login_api_function';
+
+const VIRTUAL_MEETING_LOCATION = 'Virtual';
+const emptyMeetingForm = {
+  companyName: '',
+  contactPersonName: '',
+  locationName: '',
+  startTime: '',
+  endTime: '',
+  isVirtual: false,
+};
+const meetingTimeInputClass = 'min-w-0 rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none';
+const padTime = (value) => String(value).padStart(2, '0');
+
+function MeetingDateTimeField({ label, value, onChange }) {
+  const [date, time = '09:00'] = value.split('T');
+  const [hour24, minute] = time.split(':').map(Number);
+  const hour = hour24 % 12 || 12;
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+
+  const updateTime = (nextHour, nextMinute, nextPeriod) => {
+    const nextHour24 = nextHour % 12 + (nextPeriod === 'PM' ? 12 : 0);
+    onChange(`${date}T${padTime(nextHour24)}:${padTime(nextMinute)}`);
+  };
+
+  return (
+    <fieldset className="min-w-0">
+      <legend className="mb-1.5 text-xs font-semibold text-slate-400">{label} Time</legend>
+      <input
+        type="date"
+        aria-label={`${label} Date`}
+        value={date}
+        onChange={(e) => onChange(`${e.target.value}T${time}`)}
+        className={`${meetingTimeInputClass} w-full`}
+        style={{ colorScheme: 'dark' }}
+        required
+      />
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <select aria-label={`${label} Hour`} value={hour} onChange={(e) => updateTime(Number(e.target.value), minute, period)} className={meetingTimeInputClass}>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map(value => (
+            <option key={value} value={value}>{padTime(value)}</option>
+          ))}
+        </select>
+        <select aria-label={`${label} Minute`} value={minute} onChange={(e) => updateTime(hour, Number(e.target.value), period)} className={meetingTimeInputClass}>
+          {Array.from({ length: 60 }, (_, i) => i).map(value => (
+            <option key={value} value={value}>{padTime(value)}</option>
+          ))}
+        </select>
+        <select aria-label={`${label} AM or PM`} value={period} onChange={(e) => updateTime(hour, minute, e.target.value)} className={meetingTimeInputClass}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </fieldset>
+  );
+}
 
 export default function CalendarTab() {
   const [username, setUsername] = useState('User');
@@ -153,14 +207,7 @@ export default function CalendarTab() {
 
   // Form input states
   // Meeting Log
-  const [meetingForm, setMeetingForm] = useState({
-    companyName: '',
-    contactPersonName: '',
-    locationName: '',
-    startTime: '',
-    endTime: '',
-    isScheduled: false
-  });
+  const [meetingForm, setMeetingForm] = useState(emptyMeetingForm);
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
   const [geoLocation, setGeoLocation] = useState('Location unavailable');
   const [showMomForm, setShowMomForm] = useState(false);
@@ -452,7 +499,7 @@ export default function CalendarTab() {
       async (position) => {
         const { latitude, longitude } = position.coords;
         const address = await getAddressFromCoords(latitude, longitude);
-        setMeetingForm((prev) => ({ ...prev, locationName: address }));
+        setMeetingForm((prev) => prev.isVirtual ? prev : { ...prev, locationName: address });
         setIsResolvingLocation(false);
       },
       (error) => {
@@ -608,36 +655,34 @@ export default function CalendarTab() {
   };
 
   // Action submit handlers
+  const openMeetingForm = () => {
+    setMeetingForm({
+      ...emptyMeetingForm,
+      startTime: getLocalDatetimeString(selectedDate, 9),
+      endTime: getLocalDatetimeString(selectedDate, 10),
+    });
+    setShowMeetingModal(true);
+  };
+
   const handleSaveMeeting = async (e) => {
     e.preventDefault();
     try {
       const payload = {
         companyName: meetingForm.companyName,
         contactPersonName: meetingForm.contactPersonName,
-        locationName: meetingForm.locationName || 'Mumbai Office',
+        locationName: meetingForm.isVirtual ? VIRTUAL_MEETING_LOCATION : meetingForm.locationName || 'Mumbai Office',
         startTime: formatToLocalISO(meetingForm.startTime),
         endTime: formatToLocalISO(meetingForm.endTime)
       };
 
       console.log('Saving meeting with payload:', payload);
 
-      if (meetingForm.isScheduled) {
-        const schedulePayload = {
-          meetingTitle: `Meeting with ${payload.contactPersonName}`,
-          companyName: payload.companyName,
-          contactPersonName: payload.contactPersonName,
-          locationName: payload.locationName,
-          scheduledDate: payload.startTime
-        };
-        await schedulePlannedMeeting(schedulePayload);
-      } else {
-        await saveMeetingLog(payload);
-      }
+      await saveMeetingLog(payload);
 
       alert('Meeting saved successfully!');
       setShowMeetingModal(false);
       // Reset form
-      setMeetingForm({ companyName: '', contactPersonName: '', locationName: '', startTime: '', endTime: '', isScheduled: false });
+      setMeetingForm(emptyMeetingForm);
       setCompanySearch('');
       setContactSearch('');
       fetchData();
@@ -1273,14 +1318,7 @@ export default function CalendarTab() {
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => {
-                    setMeetingForm((prev) => ({
-                      ...prev,
-                      startTime: getLocalDatetimeString(selectedDate, 9),
-                      endTime: getLocalDatetimeString(selectedDate, 10)
-                    }));
-                    setShowMeetingModal(true);
-                  }}
+                  onClick={openMeetingForm}
                   className="px-2.5 py-1 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-blue-400 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 animate-fade shadow"
                   title="Log Meeting"
                 >
@@ -1411,14 +1449,7 @@ export default function CalendarTab() {
                   <div className="p-6 border-t border-white/5 flex flex-col items-center justify-center gap-3 text-center bg-slate-950/20">
                     <p className="text-xs text-slate-500 font-medium">No meetings scheduled for this day</p>
                     <button
-                      onClick={() => {
-                        setMeetingForm((prev) => ({
-                          ...prev,
-                          startTime: getLocalDatetimeString(selectedDate, 9),
-                          endTime: getLocalDatetimeString(selectedDate, 10)
-                        }));
-                        setShowMeetingModal(true);
-                      }}
+                      onClick={openMeetingForm}
                       className="px-4 py-2 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -1854,21 +1885,34 @@ export default function CalendarTab() {
 
               {/* Geolocation Resolver Location */}
               <div>
-                <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Location Address</label>
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <label htmlFor="meeting-location" className="text-xs font-semibold text-slate-400">Location Address</label>
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={meetingForm.isVirtual}
+                      onChange={(e) => setMeetingForm({ ...meetingForm, isVirtual: e.target.checked })}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    Virtual
+                  </label>
+                </div>
                 <div className="flex gap-2">
                   <input
+                    id="meeting-location"
                     type="text"
                     placeholder="Auto-fills from coordinates"
-                    value={meetingForm.locationName}
+                    value={meetingForm.isVirtual ? VIRTUAL_MEETING_LOCATION : meetingForm.locationName}
                     onChange={(e) => setMeetingForm({ ...meetingForm, locationName: e.target.value })}
-                    className="flex-1 px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
-                    required
+                    className="min-w-0 flex-1 px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-100"
+                    readOnly={meetingForm.isVirtual}
+                    required={!meetingForm.isVirtual}
                   />
                   <button
                     type="button"
                     onClick={handleResolveLocation}
-                    disabled={isResolvingLocation}
-                    className="px-3 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 hover:border-blue-500 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition"
+                    disabled={isResolvingLocation || meetingForm.isVirtual}
+                    className="px-3 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 hover:border-blue-500 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition disabled:opacity-50"
                   >
                     {isResolvingLocation ? <Loader className="h-4 w-4 animate-spin text-blue-400" /> : <MapPin className="h-4 w-4" />}
                     GPS
@@ -1878,40 +1922,16 @@ export default function CalendarTab() {
 
               {/* Date times */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Start Time</label>
-                  <input
-                    type="datetime-local"
-                    value={meetingForm.startTime}
-                    onChange={(e) => setMeetingForm({ ...meetingForm, startTime: e.target.value })}
-                                                         required                  />
-                               </div>
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold mb-1.5 block">End Time</label>
-                  <input
-                    type="datetime-local"
-                    value={meetingForm.endTime}
-                    onChange={(e) => setMeetingForm({ ...meetingForm, endTime: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-sm focus:outline-none focus:border-blue-500 text-slate-300 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-150 cursor-pointer"
-                    style={{ colorScheme: 'dark' }}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Dual scheduling toggle */}
-              <div className="flex items-center gap-3 bg-slate-900/40 p-4 rounded-xl border border-white/5">
-                <input
-                  type="checkbox"
-                  id="schedToggle"
-                  checked={meetingForm.isScheduled}
-                  onChange={(e) => setMeetingForm({ ...meetingForm, isScheduled: e.target.checked })}
-                  className="rounded bg-slate-950 border-white/10 h-4 w-4 text-blue-600 focus:ring-0"
+                <MeetingDateTimeField
+                  label="Start"
+                  value={meetingForm.startTime}
+                  onChange={(startTime) => setMeetingForm(prev => ({ ...prev, startTime }))}
                 />
-                <label htmlFor="schedToggle" className="text-xs text-slate-300 cursor-pointer select-none">
-                  <span className="font-bold block">Reserve Itinerary Slot</span>
-                  <span className="text-[11px] text-slate-500 mt-0.5 block">Checking this schedules the meeting log into planned visits calendar.</span>
-                </label>
+                <MeetingDateTimeField
+                  label="End"
+                  value={meetingForm.endTime}
+                  onChange={(endTime) => setMeetingForm(prev => ({ ...prev, endTime }))}
+                />
               </div>
 
               <button
