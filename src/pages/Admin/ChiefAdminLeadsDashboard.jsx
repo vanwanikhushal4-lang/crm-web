@@ -564,7 +564,7 @@ export default function ChiefAdminLeadsDashboard() {
     return rows.flatMap(row => {
       const { lead, mom, customer } = row;
       const ownership = resolvePipelineOwner(lead, mom, customer, userNameMap, allUsers);
-      if (isPocOwner(ownership)) return [];
+      if (ownership.owner === 'Unassigned' || isPocOwner(ownership)) return [];
 
       // An excluded meeting can be linked to another rep's lead on a shared account.
       const linkedMom = mom && isPocOwner(resolvePipelineOwner(null, mom, customer, userNameMap, allUsers))
