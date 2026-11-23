@@ -13,13 +13,15 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  FileText
+  FileText,
+  Headphones
 } from 'lucide-react';
 import bizdriveLogo from '../assets/BIZDRIVE-LOGO.png';
 import DailyAttendance from './Admin/DailyAttendance';
 import SalespersonActivity from './Admin/SalespersonActivity';
 import ChiefAdminLeadsDashboard from './Admin/ChiefAdminLeadsDashboard';
 import DssrTab from './Admin/DssrTab';
+import InsideSalesDashboard from './Admin/InsideSalesDashboard';
 import { getAllUsers } from '../api/apiFunctions/Login/Login_api_function';
 
 export default function AdminDashboard() {
@@ -72,6 +74,7 @@ export default function AdminDashboard() {
   const navigationItems = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'dssr', label: 'DSSR Activity', icon: FileText },
+    { id: 'inside-sales', label: 'Inside Sales', icon: Headphones },
     { id: 'attendance', label: 'Daily Attendance', icon: Clock },
     { id: 'tracking', label: 'Live Map Tracking', icon: Map },
     { id: 'sales-calendar', label: 'Calendars', icon: CalendarDays },
@@ -84,6 +87,8 @@ export default function AdminDashboard() {
         return 'Overview Pipeline';
       case 'dssr':
         return 'DSSR Activity Logs & Analytics';
+      case 'inside-sales':
+        return 'Inside Sales';
       case 'attendance':
         return 'Daily Attendance';
       case 'tracking':
@@ -298,6 +303,8 @@ export default function AdminDashboard() {
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
 
           {activeTab === 'dssr' && <DssrTab />}
+
+          {activeTab === 'inside-sales' && <InsideSalesDashboard />}
 
           {activeTab === 'attendance' && <DailyAttendance />}
 
