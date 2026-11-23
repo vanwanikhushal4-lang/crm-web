@@ -26,6 +26,7 @@ import {
   getAllMomDetails,
   getAllCustomerDetails
 } from '../../api/apiFunctions/Login/Login_api_function';
+import { fetchSalesPersonList, fetchInsideSalesList } from '../../api/Admin/SalespersonApi';
 import RunningNumber from '../../components/common/RunningNumber';
 
 // Safe list extraction helper to match nested database schemas
@@ -136,6 +137,56 @@ export const buildUserNameMap = (users) => {
   return map;
 };
 
+// The POC account is distinct from the similarly named Khushal Vanwani account.
+const POC_USER_ID = '2';
+
+const isPocOwner = ({ ownerId, owner }) => {
+  if (ownerId === POC_USER_ID) return true;
+
+  return [ownerId, owner].some(value => {
+    const name = String(value ?? '').trim().replace(/\s+/g, ' ');
+    return name === 'khushal vanwani' || /^khushal vanwani\s*\(\s*poc\s*\)$/i.test(name);
+  });
+};
+
+const resolvePipelineOwner = (lead, mom, customer, userNameMap, users) => {
+  const leadOwnerId = String(
+    lead?.assignedTo || lead?.userId || lead?.user_id || lead?.createdBy || lead?.salesmanId || ''
+  ).trim();
+  const leadOwnerName = userNameMap[leadOwnerId] || lead?.ownerName || lead?.owner;
+  if (leadOwnerName || isPocOwner({ ownerId: leadOwnerId })) {
+    return { ownerId: leadOwnerId, owner: leadOwnerName || 'Unassigned' };
+  }
+
+  const ownerId = String(
+    leadOwnerId ||
+    mom?.userId || mom?.user_id || mom?.createdBy || mom?.assignedTo ||
+    customer?.userId || customer?.user_id || customer?.assignedTo || ''
+  ).trim();
+
+  const pitchedByWhom = mom?.pitch_details?.pitched_by_whom || mom?.competition_and_history?.pitched_by_whom ||
+    mom?.pitchedByWhom || mom?.pitched_by_whom || customer?.salesPerson || customer?.contactPersonName || '';
+
+  let owner = userNameMap[ownerId];
+  if (!owner && pitchedByWhom) {
+    const pitchOwner = String(pitchedByWhom).trim();
+    const getName = (user) => {
+      const first = user.firstName || user.firstname || user.first_name || '';
+      const last = user.lastName || user.lastname || user.last_name || '';
+      return `${first} ${last}`.trim() || user.fullName || user.username || user.email || '';
+    };
+    const matchedUser = users.find(user => getName(user) === pitchOwner) ||
+      users.find(user => getName(user).toLowerCase() === pitchOwner.toLowerCase());
+    if (matchedUser) {
+      const matchedId = String(matchedUser.id || matchedUser.userId || matchedUser.user_id || '').trim();
+      return { ownerId: matchedId || ownerId, owner: userNameMap[matchedId] || pitchOwner };
+    }
+    owner = pitchOwner;
+  }
+
+  return { ownerId, owner: owner || 'Unassigned' };
+};
+
 export default function ChiefAdminLeadsDashboard() {
   // Tab and Filters State
   const [activeTab, setActiveTab] = useState('DASHBOARD'); // 'DASHBOARD' | 'HOT' | 'WARM'
@@ -199,6 +250,7 @@ export default function ChiefAdminLeadsDashboard() {
   const [activeOutsiders, setActiveOutsiders] = useState([]);
   const [allMoms, setAllMoms] = useState([]);
   const [allCustomers, setAllCustomers] = useState([]);
+  const [salesPersonGroups, setSalesPersonGroups] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -210,7 +262,7 @@ export default function ChiefAdminLeadsDashboard() {
     setIsLoading(true);
     setError(null);
     try {
-      const [leadsRes, usersRes, outsidersRes, momsRes, customersRes] = await Promise.all([
+      const [leadsRes, usersRes, outsidersRes, momsRes, customersRes, managersRes, insideSalesRes] = await Promise.all([
         getAllLeads().catch((err) => {
           console.error("Failed to load leads:", err);
           return [];
@@ -230,7 +282,9 @@ export default function ChiefAdminLeadsDashboard() {
         getAllCustomerDetails().catch((err) => {
           console.warn("Failed to load customer details:", err);
           return [];
-        })
+        }),
+        fetchSalesPersonList().catch(() => []),
+        fetchInsideSalesList().catch(() => [])
       ]);
 
       const rawLeads = extractList(leadsRes);
@@ -269,6 +323,29 @@ export default function ChiefAdminLeadsDashboard() {
           return cleanUsers.some(u => u && String(u.id || u.userId || u.user_id || '') === uId);
         });
 
+      const salesTeams = [
+        { label: 'Sales Managers', users: extractList(managersRes) },
+        { label: 'Inside Sales', users: extractList(insideSalesRes) },
+      ];
+      const salesPeople = new Map();
+      for (const { label, users } of salesTeams) {
+        for (const user of users) {
+          const ownerId = String(user?.id || user?.userId || user?.user_id || user?.salesPersonId || user?.salespersonId || '').trim();
+          const first = user?.firstName || user?.firstname || user?.first_name || '';
+          const last = user?.lastName || user?.lastname || user?.last_name || '';
+          const owner = `${first} ${last}`.trim() || user?.fullName || user?.name || user?.salesPersonName || user?.userName || user?.username || user?.email || '';
+          if (ownerId && owner && !isPocOwner({ ownerId, owner })) {
+            salesPeople.set(ownerId, { ownerId, owner, label });
+          }
+        }
+      }
+      setSalesPersonGroups(salesTeams.map(({ label }) => ({
+        label,
+        people: Array.from(salesPeople.values())
+          .filter(person => person.label === label)
+          .sort((a, b) => a.owner.localeCompare(b.owner)),
+      })));
+      setListRepFilter(current => salesPeople.has(current) ? current : 'ALL');
       setAllLeads(cleanLeads);
       setAllUsers(cleanUsers);
       setActiveOutsiders(Array.isArray(rawOutsiders) ? rawOutsiders : []);
@@ -288,17 +365,6 @@ export default function ChiefAdminLeadsDashboard() {
     }, 0);
     return () => clearTimeout(timer);
   }, []);
-
-  // Helper to map and resolve User IDs to human-readable names
-  const getUserName = (userId) => {
-    const user = allUsers.find(u => u && String(u.id || u.userId || u.user_id || '') === String(userId));
-    if (user) {
-      const fName = user.firstName || user.firstname || user.first_name || '';
-      const lName = user.lastName || user.lastname || user.last_name || '';
-      return `${fName} ${lName}`.trim() || user.fullName || user.name || user.username || user.email || `Rep ${userId}`;
-    }
-    return `Rep ${userId}`;
-  };
 
   // Helper to get role (Outsider vs Sales Manager)
   const getUserRole = (repName) => {
@@ -474,37 +540,25 @@ export default function ChiefAdminLeadsDashboard() {
       });
     });
 
-    return rows;
-  }, [allLeads, allCustomers, allMoms]);
+    return rows.flatMap(row => {
+      const { lead, mom, customer } = row;
+      const ownership = resolvePipelineOwner(lead, mom, customer, userNameMap, allUsers);
+      if (isPocOwner(ownership)) return [];
+
+      // An excluded meeting can be linked to another rep's lead on a shared account.
+      const linkedMom = mom && isPocOwner(resolvePipelineOwner(null, mom, customer, userNameMap, allUsers))
+        ? null
+        : mom;
+      return [{ ...row, mom: linkedMom, ...ownership }];
+    });
+  }, [allLeads, allCustomers, allMoms, userNameMap, allUsers]);
 
   // 2. Map raw API leads and MOM details to normalized UI records and filter by the selected month
   const mappedLeads = useMemo(() => {
     return unifiedLeads
-      .map(({ lead, mom, customer, isMomOnly }) => {
+      .map(({ lead, mom, customer, isMomOnly, ownerId, owner }) => {
         const pitch = mom?.pitch_details || {};
         const outcome = mom?.outcome || {};
-
-        const ownerId = String(
-          lead?.assignedTo || lead?.userId || lead?.user_id || lead?.createdBy || lead?.salesmanId ||
-          mom?.userId || mom?.user_id || mom?.createdBy || mom?.assignedTo ||
-          customer?.userId || customer?.user_id || customer?.assignedTo || ''
-        );
-
-        const pitchedByWhom = pitch?.pitched_by_whom || mom?.competition_and_history?.pitched_by_whom || mom?.pitchedByWhom || mom?.pitched_by_whom || customer?.salesPerson || customer?.contactPersonName || '';
-
-        let owner = userNameMap[ownerId];
-        if (!owner && pitchedByWhom) {
-          const matchedUser = allUsers.find(u => {
-            const f = u.firstName || u.firstname || u.first_name || '';
-            const l = u.lastName || u.lastname || u.last_name || '';
-            const fn = `${f} ${l}`.trim() || u.fullName || u.username || u.email || '';
-            return fn.toLowerCase() === pitchedByWhom.trim().toLowerCase();
-          });
-          owner = matchedUser ? (userNameMap[String(matchedUser.id || matchedUser.userId || matchedUser.user_id)] || pitchedByWhom) : pitchedByWhom;
-        }
-        if (!owner) {
-          owner = lead?.ownerName || lead?.owner || 'Unassigned';
-        }
 
         const company = 
           lead?.companyName || lead?.company || lead?.customerName ||
@@ -573,7 +627,7 @@ export default function ChiefAdminLeadsDashboard() {
                d.getFullYear() === selectedDate.getFullYear() && 
                d.getMonth() === selectedDate.getMonth();
       });
-  }, [unifiedLeads, userNameMap, allUsers, selectedDate]);
+  }, [unifiedLeads, selectedDate]);
 
   // Subset filters
   const hotLeads = useMemo(() => mappedLeads.filter(l => l.isHot && !l.isWon && !l.isLost), [mappedLeads]);
@@ -819,25 +873,8 @@ export default function ChiefAdminLeadsDashboard() {
       });
     }
 
-    unifiedLeads.forEach(({ lead, mom, customer }) => {
+    unifiedLeads.forEach(({ lead, mom, owner }) => {
       const pitch = mom?.pitch_details || {};
-      const ownerId = String(
-        lead?.assignedTo || lead?.userId || lead?.user_id || lead?.createdBy || lead?.salesmanId ||
-        mom?.userId || mom?.user_id || mom?.createdBy || mom?.assignedTo ||
-        customer?.userId || customer?.user_id || customer?.assignedTo || ''
-      );
-      const pitchedByWhom = pitch?.pitched_by_whom || mom?.competition_and_history?.pitched_by_whom || mom?.pitchedByWhom || mom?.pitched_by_whom || customer?.salesPerson || customer?.contactPersonName || '';
-      let owner = userNameMap[ownerId];
-      if (!owner && pitchedByWhom) {
-        const matchedUser = allUsers.find(u => {
-          const f = u.firstName || u.firstname || u.first_name || '';
-          const l = u.lastName || u.lastname || u.last_name || '';
-          const fn = `${f} ${l}`.trim() || u.fullName || u.username || u.email || '';
-          return fn.toLowerCase() === pitchedByWhom.trim().toLowerCase();
-        });
-        owner = matchedUser ? (userNameMap[String(matchedUser.id || matchedUser.userId || matchedUser.user_id)] || pitchedByWhom) : pitchedByWhom;
-      }
-      if (!owner) owner = lead?.ownerName || lead?.owner || 'Unassigned';
 
       if (selectedRep !== 'All Team Members' && owner.toLowerCase() !== selectedRep.toLowerCase()) {
         return;
@@ -865,7 +902,7 @@ export default function ChiefAdminLeadsDashboard() {
     });
 
     return months;
-  }, [unifiedLeads, selectedDate, selectedRep, userNameMap, allUsers]);
+  }, [unifiedLeads, selectedDate, selectedRep]);
 
   // Targets Metrics progress calculations
   const targetMetrics = useMemo(() => {
@@ -1174,7 +1211,7 @@ export default function ChiefAdminLeadsDashboard() {
 
     // Apply Rep Chip Filter
     if (listRepFilter !== 'ALL') {
-      filtered = filtered.filter(l => String(l.userId) === listRepFilter);
+      filtered = filtered.filter(l => l.ownerId === listRepFilter);
     }
 
     // Apply Text Search Query
@@ -2113,18 +2150,13 @@ export default function ChiefAdminLeadsDashboard() {
                       }}
                     >
                       <option value="ALL" style={{ background: '#0f172a', color: '#fff' }}>All Sales People</option>
-                      {allUsers.map((user) => {
-                        const uId = String(user.id || user.userId);
-                        return (
-                          <option 
-                            key={uId} 
-                            value={uId}
-                            style={{ background: '#0f172a', color: '#fff' }}
-                          >
-                            {getUserName(uId)}
-                          </option>
-                        );
-                      })}
+                      {salesPersonGroups.map(({ label, people }) => (
+                        <optgroup key={label} label={label} style={{ background: '#0f172a', color: '#fff' }}>
+                          {people.map(({ ownerId, owner }) => (
+                            <option key={ownerId} value={ownerId}>{owner}</option>
+                          ))}
+                        </optgroup>
+                      ))}
                     </select>
                     <div style={{
                       position: 'absolute',
@@ -2228,7 +2260,7 @@ export default function ChiefAdminLeadsDashboard() {
                             <p className="text-muted" style={{ fontSize: '11px' }}>Sales Owner</p>
                             <span style={{ fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <User size={12} color="#94a3b8" />
-                              {getUserName(lead.userId)}
+                              {lead.owner}
                             </span>
                           </div>
                           <div>
